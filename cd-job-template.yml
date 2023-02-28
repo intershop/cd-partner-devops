@@ -258,6 +258,9 @@ jobs:
   
           # Create a temporary file
           tmpfile=$(mktemp)
+
+          # Create valid customizations list
+          validCustomizationsList="[]"
   
           # Remove spaces from the file and write the result to the temporary file
           tr -d ' ' < "${IMAGE_ARTIFACT_FILE_PATH}" > "${tmpfile}"
@@ -266,7 +269,7 @@ jobs:
           cp "${tmpfile}" "${IMAGE_ARTIFACT_FILE_PATH}"
   
           # Use yq to delete the values under the spec.values.icm-as.customizations key
-          yq -i 'del(.spec.values.icm-as.customizations.*)' ${PATCH_FILE_FULL_PATH}
+          # yq -i 'del(.spec.values.icm-as.customizations.*)' ${PATCH_FILE_FULL_PATH}
   
           # Check if the "build" key exists in the IMAGE_ARTIFACT_FILE_PATH file
           if ! grep -q '^build=' ${IMAGE_ARTIFACT_FILE_PATH}; then
@@ -276,7 +279,13 @@ jobs:
   
           # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
           buildValue=$(grep '^build=' ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
-  
+
+          # Replaces all underscores (_) in a string with hyphens (-)
+          buildValueOnlyHyphens="${buildValue//_/-}"
+
+          # Add buildValueOnlyHyphens to validCustomizationsList
+          validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${buildValueOnlyHyphens}"  -rc '. + [$element]')"
+
           # Check if the "<buildValue>.version" key exists in the IMAGE_ARTIFACT_FILE_PATH file
           if ! grep -q "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH}; then
               echo "##[error] The '${buildValue}.version' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
@@ -286,7 +295,7 @@ jobs:
           # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
           buildValueVersion=$(grep "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
           # Add the ${buildValue} version to .spec.values.icm-as.customizations.<customization>.repository
-          repositoryName="${buildValue}" \
+          repositoryName="${buildValueOnlyHyphens}" \
             repositoryTag="\${project_container_registry}/${buildValue}:${buildValueVersion}" \
             yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
             ${PATCH_FILE_FULL_PATH}
@@ -331,11 +340,33 @@ jobs:
   
               # Add all other customizations versions to .spec.values.icm-as.customizations.<customization>.repository
               else
-                repositoryName="${container}" \
+
+                # Replaces all underscores (_) in a string with hyphens (-)
+                containerOnlyHyphens="${container//_/-}"
+
+                # Add containerOnlyHyphens to validCustomizationsList
+                validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${containerOnlyHyphens}"  -rc '. + [$element]')"
+
+                repositoryName="${containerOnlyHyphens}" \
                   repositoryTag="\${icm_container_registry}/${container}:${containerVersion}" \
                   yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
                   ${PATCH_FILE_FULL_PATH}
               fi
+          done
+
+          # Remove invalid customizations
+          allCustomizations="$(yq '.spec.values.icm-as.customizations | keys' ${PATCH_FILE_FULL_PATH} -o j | jq -rc)"
+
+          echo "allCustomizations = ${allCustomizations}"
+          echo "validCustomizationsList = ${validCustomizationsList}"
+
+          for customization in $(echo "${allCustomizations}" | jq -r '.[]'); do
+            if [[ -z $(echo "${validCustomizationsList}" | jq --arg el "${customization}" '. | index($el) // empty') ]]; then
+              
+              echo "Remove the customization: ${customization}"
+              invalidCustomization="${customization}" \
+                yq -i 'del(.spec.values.icm-as.customizations.[env(invalidCustomization)])' ${PATCH_FILE_FULL_PATH}
+            fi
           done
           
           # Copy the patched ${PATCH_FILE_FULL_PATH} file
