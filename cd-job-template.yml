@@ -1,0 +1,594 @@
+################################################################################
+# Parameters have to be specified by the caller, to customize the pipeline
+# for a certain project
+################################################################################
+parameters:
+
+  # Has to be set, if ci-job-template.yml is used in a loop, for two reasons:
+  # - to make each job-name unique,
+  # - to extend names of files, which are published in extensions.
+  # For this reason id must consitst of characters, numbers and _ only.
+- name: id
+  type: string
+  default: ''
+  
+  # Enables an easy integration with custom jobs. The parameter will be passed
+  # as is to the 'dependsOn' property of the job.
+- name: dependsOn
+  type: string
+  default: ''
+
+  # Enables an easy integration with custom jobs. The parameter will be passed
+  # as is to the 'condition' property of the job.
+- name: condition
+  type: string
+  default: ''
+
+  # Every partner has it's own agent-pool, therefore the name of the pool cannot
+  # be hardcoded in the pipeline template.
+- name: agentPool
+  type: string
+  default: ''
+
+  # Maximum job execution time
+- name: jobTimeoutInMinutes
+  type: number
+  default: 300
+
+  # 'true' if future jobs should run even if this job fails; defaults to 'false'
+- name: jobContinueOnError
+  type: boolean
+  default: false
+
+  # Each product requires an individual process.
+- name: product
+  type: string
+  default: 
+  values:
+  - icm
+
+  # Name of the environment.
+- name: env
+  type: string
+  default: 
+
+  # Name of the environments repository.
+  # The name is given in "resources.repositories".
+- name: environmentPath
+  type: string
+  default: environments
+
+  # Name of the environments branch.
+  # The branch name is given in "resources.repositories".
+- name: environmentBranch
+  type: string
+  default: master
+
+  # Name of the Ci pipeline
+  # The branch name is given in "resources.pipelines".
+- name: triggerPipelineName
+  type: string
+  default:
+
+  # Name of the ci-pipeline artifact
+- name: pipelineArtifactName
+  type: string
+  default: image
+
+  # Name of the file to be analysed
+- name: imagePropertiesFile
+  type: string
+  default: imageProperties
+
+  # Path of version file to be overwritten in the environment repository
+  # For example: int/icm/version.yaml
+- name: versionFilePath
+  type: string
+  default:
+
+  # PullRequest creation
+- name: prCreatePullRequest
+  type: boolean
+  default: true
+
+  # Delete the source branch after the pull request has been completed and merged into the target branch.
+- name: prDeleteSourceBranch
+  type: boolean
+  default: true
+
+  # Additional users or groups to include as reviewers on the new pull request. Space separated.
+- name: prReviewers
+  type: string
+  default:
+
+  # Squash the commits in the source branch when merging into the target branch.
+- name: prSquash
+  type: boolean
+  default: true
+
+  # Set the pull request to complete automatically when all policies have passed and the source branch can be merged into the target branch.
+- name: prAutoComplete
+  type: boolean
+  default: true
+
+jobs:
+- job: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
+  pool: '${{ parameters.agentPool }}'
+  dependsOn: ${{ parameters.dependsOn }}
+  condition: ${{ parameters.condition }}
+  continueOnError: ${{ parameters.jobContinueOnError }}
+  timeoutInMinutes: ${{ parameters.jobTimeoutInMinutes }}
+  workspace:
+    clean: all
+  variables:
+    - name: IMAGE_ARTIFACT_FILE_PATH
+      value: $(Pipeline.Workspace)/${{ parameters.triggerPipelineName }}/${{ parameters.pipelineArtifactName }}/${{ parameters.imagePropertiesFile }}
+    - name: ENVIRONMENTS_DIRECTORY
+      value: $(Pipeline.Workspace)/s/${{ parameters.environmentPath }}
+    - name: PATCH_FILE_FULL_PATH
+      value: $(Pipeline.Workspace)/s/${{ parameters.environmentPath }}/${{ parameters.versionFilePath }}
+    - name: MD_CONFIG_FILE
+      value: $(Pipeline.Workspace)/config_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
+    - name: MD_PATCH_FILE
+      value: $(Pipeline.Workspace)/cd-patched-file_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
+  
+  steps:
+    - download: ${{ parameters.triggerPipelineName }}
+    - checkout: self
+      clean: true
+    - checkout: ${{ parameters.environmentPath }}
+      clean: true
+      persistCredentials: true
+      fetchDepth: 1
+  
+    - task: Bash@3
+      displayName: Check parameters
+      timeoutInMinutes: 2
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+
+          cat > "$(MD_CONFIG_FILE)" <<EOF
+  
+          # Parameters
+              id:                         ${{ parameters.id }}
+              project:                    ${{ parameters.product }}
+              triggerPipelineName:        ${{ parameters.triggerPipelineName }}
+              pipelineArtifactName:       ${{ parameters.pipelineArtifactName }}
+              imagePropertiesFile:        ${{ parameters.imagePropertiesFile }}
+              environmentPath:            ${{ parameters.environmentPath }}
+              environmentBranch:          ${{ parameters.environmentBranch }}
+              versionFilePath:            ${{ parameters.versionFilePath }}
+              PATCH_FILE_FULL_PATH:       $(PATCH_FILE_FULL_PATH)
+              IMAGE_ARTIFACT_FILE_PATH:   $(IMAGE_ARTIFACT_FILE_PATH)
+              prCreatePullRequest:        ${{ parameters.prCreatePullRequest }}
+              prDeleteSourceBranch:       ${{ parameters.prDeleteSourceBranch }}
+              prReviewers:                ${{ parameters.prReviewers }}
+              prAutoComplete:             ${{ parameters.prAutoComplete }}
+              prSquash:                   ${{ parameters.prSquash }}
+
+          # Pipeline
+              pipelineID:                 $(resources.pipeline.${{ parameters.triggerPipelineName }}.pipelineID)
+              runName:                    $(resources.pipeline.${{ parameters.triggerPipelineName }}.runName)
+              runID:                      $(resources.pipeline.${{ parameters.triggerPipelineName }}.runID)
+              runURI:                     $(resources.pipeline.${{ parameters.triggerPipelineName }}.runURI)
+              sourceBranch:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceBranch)
+              sourceCommit:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)
+  
+          EOF
+      
+          if [ -z "${{ parameters.product }}" ]; then
+            echo "##[error] Parameter product must not be empty!"
+            exit 1
+          fi
+          if [ -z "${{ parameters.pipelineArtifactName }}" ]; then
+            echo "##[error] Parameter pipelineArtifactName must not be empty!"
+            exit 1
+          fi
+
+          if [ -z "${{ parameters.imagePropertiesFile }}" ]; then
+            echo "##[error] Parameter imagePropertiesFile must not be empty!"
+            exit 1
+          fi
+  
+          if [ -z "${{ parameters.environmentBranch }}" ]; then
+            echo "##[error] Parameter environmentBranch must not be empty!"
+            exit 1
+          fi
+
+          if [ -z "${{ parameters.env }}" ]; then
+            echo "##[error] Parameter environmentBranch must not be empty!"
+            exit 1
+          fi
+
+          # Check if the 'IMAGE_ARTIFACT_FILE_PATH' file exists
+          if [ ! -f $(IMAGE_ARTIFACT_FILE_PATH) ]; then
+              echo "##[error] The file IMAGE_ARTIFACT_FILE_PATH does not exist."
+              exit 1
+          fi
+          if [ ! -s $(IMAGE_ARTIFACT_FILE_PATH) ]; then
+              echo "##[error] The file IMAGE_ARTIFACT_FILE_PATH exists but is empty."
+              exit 1
+          fi
+  
+          if [ -z "${{ parameters.versionFilePath }}" ]; then
+            echo "##[error] Parameter versionFilePath must not be empty!"
+            exit 1
+          fi
+          
+          # Check if the 'PATCH_FILE_FULL_PATH' file exists
+          if [ ! -f $(PATCH_FILE_FULL_PATH) ]; then
+              echo "##[error] The PATCH_FILE_FULL_PATH file does not exist."
+              exit 1
+          fi
+
+          if [ ! -z "${{ parameters.id }}" ]; then
+            if echo "${{ parameters.id }}" | grep -q '[^a-zA-Z0-9_]'; then
+              echo "##[error] Parameter id has to consist of characters, numbers and _ only!"
+              exit 1
+            fi
+          fi
+
+    - task: Bash@3
+      displayName: 'Install yq'
+      timeoutInMinutes: 2
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+  
+          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo chmod +x /usr/bin/yq
+  
+    - task: Bash@3
+      timeoutInMinutes: 5
+      displayName: "Parse the file"
+      env:
+        IMAGE_ARTIFACT_FILE_PATH: $(IMAGE_ARTIFACT_FILE_PATH)
+        PATCH_FILE_FULL_PATH: $(PATCH_FILE_FULL_PATH)
+        BUILD_BUILD_NUMBER: $(Build.BuildNumber)
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+  
+          # Create a temporary file
+          tmpfile=$(mktemp)
+  
+          # Remove spaces from the file and write the result to the temporary file
+          tr -d ' ' < "${IMAGE_ARTIFACT_FILE_PATH}" > "${tmpfile}"
+  
+          # Copy the temporary file back to the original file
+          cp "${tmpfile}" "${IMAGE_ARTIFACT_FILE_PATH}"
+  
+          # Use yq to delete the values under the spec.values.icm-as.customizations key
+          yq -i 'del(.spec.values.icm-as.customizations.*)' ${PATCH_FILE_FULL_PATH}
+  
+          # Check if the "build" key exists in the IMAGE_ARTIFACT_FILE_PATH file
+          if ! grep -q '^build=' ${IMAGE_ARTIFACT_FILE_PATH}; then
+              echo "##[error] The 'build' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+              exit 1
+          fi
+  
+          # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
+          buildValue=$(grep '^build=' ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
+  
+          # Check if the "<buildValue>.version" key exists in the IMAGE_ARTIFACT_FILE_PATH file
+          if ! grep -q "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH}; then
+              echo "##[error] The '${buildValue}.version' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+              exit 1
+          fi
+  
+          # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
+          buildValueVersion=$(grep "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
+          # Add the ${buildValue} version to .spec.values.icm-as.customizations.<customization>.repository
+          repositoryName="${buildValue}" \
+            repositoryTag="\${project_container_registry}/${buildValue}:${buildValueVersion}" \
+            yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
+            ${PATCH_FILE_FULL_PATH}
+  
+          # Check if the "build.with" key exists in the IMAGE_ARTIFACT_FILE_PATH file
+          if ! grep -q '^build.with=' ${IMAGE_ARTIFACT_FILE_PATH}; then
+              echo "##[error] The 'build.with' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+              exit 1
+          fi
+  
+          # Get the value of the "build.with" key from the IMAGE_ARTIFACT_FILE_PATH file
+          buildWithValue=$(grep '^build.with=' ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
+  
+          # Iterate over the comma-separated values in the "build.with" key
+          IFS=',' read -ra build_with_array  <<< ${buildWithValue}
+          for container in "${build_with_array[@]}"; do
+              echo "Value in 'build.with' key: ${container}"
+  
+              # Check if the "<$container>.version" key exists in the IMAGE_ARTIFACT_FILE_PATH file
+              if ! grep -q "^${container}.version=" ${IMAGE_ARTIFACT_FILE_PATH}; then
+                  echo "##[error] The '${container}.version' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+                  exit 1
+              fi
+  
+              # Get the value of the "<$container>.version" key from the IMAGE_ARTIFACT_FILE_PATH file
+              containerVersion=$(grep "^${container}.version=" ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
+  
+              # Add the icm-as version to spec.values.icm-as.image.tag
+              if [ "${container}" == "icm-as" ]; then
+                version="${containerVersion}" \
+                  yq -i '.spec.values.icm-as.image.tag  = strenv(version)' ${PATCH_FILE_FULL_PATH}
+  
+              # Add the icm-webadapteragent version to spec.values.icm-web.agent.image.repository  
+              elif [ "${container}" == "icm-webadapteragent" ]; then
+                repositoryValue="\${icm_container_registry}/${container}:${containerVersion}" \
+                  yq -i '.spec.values.icm-web.agent.image.repository = strenv(repositoryValue)' ${PATCH_FILE_FULL_PATH}
+  
+              # Add the icm-webadapter version to spec.values.icm-web.webadapter.image.repository  
+              elif [ "${container}" == "icm-webadapter" ]; then
+                repositoryValue="\${icm_container_registry}/${container}:${containerVersion}" \
+                  yq -i '.spec.values.icm-web.webadapter.image.repository = strenv(repositoryValue)' ${PATCH_FILE_FULL_PATH}
+  
+              # Add all other customizations versions to .spec.values.icm-as.customizations.<customization>.repository
+              else
+                repositoryName="${container}" \
+                  repositoryTag="\${icm_container_registry}/${container}:${containerVersion}" \
+                  yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
+                  ${PATCH_FILE_FULL_PATH}
+              fi
+          done
+          
+          # Copy the patched ${PATCH_FILE_FULL_PATH} file
+          cat > "$(MD_PATCH_FILE)" <<EOF
+  
+            \`\`\`
+  
+              $(cat ${PATCH_FILE_FULL_PATH})
+  
+            \`\`\`
+          EOF
+
+          cat >> "$(MD_CONFIG_FILE)" <<EOF
+  
+          # Customization
+              image:                    ${buildValue}
+              tag:                      ${buildValueVersion}
+  
+          EOF
+
+          # Calc the new buildNumber
+          buildNumberPart="${BUILD_BUILD_NUMBER%%_*}"
+          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${buildValue}_${buildValueVersion}"
+          echo "##vso[build.addbuildtag]${{ parameters.product }}"
+  
+    - task: Bash@3
+      timeoutInMinutes: 1
+      displayName: "Set branch name"
+      env:
+        ENV_PATH: "${{ parameters.versionFilePath }}"
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+  
+          # Get the revision from the $(Build.BuildNumber)
+          BUILD_BUILDNUMBER="$(Build.BuildNumber)"
+          revision="${BUILD_BUILDNUMBER##*.}"
+  
+          if [ -z "${revision}" ]; then
+            echo "##[error] Variable revision must not be empty!"
+            exit 1
+          fi
+  
+          # Short sourceCommit
+          sourceCommit="$(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)"
+          shortSourceCommit="${sourceCommit:0:10}"
+  
+          if [ -z "${shortSourceCommit}" ]; then
+            echo "##[error] Variable shortSourceCommit must not be empty!"
+            exit 1
+          fi
+  
+          # environment
+          environment="${ENV_PATH%%/*}"
+  
+          branchName="${{ parameters.product }}-${environment}/${shortSourceCommit}-$(Build.BuildId)-${revision}"
+          echo "branchName: ${branchName}"
+  
+          cat >> "$(MD_CONFIG_FILE)" <<EOF
+  
+          # Branch
+              branch:                    ${branchName}
+  
+          EOF
+          echo "##vso[task.setvariable variable=BRANCH_NAME]${branchName}"
+    - task: Bash@3
+      timeoutInMinutes: 1
+      displayName: "Current git variables"
+      inputs:
+        targetType: 'inline'
+        workingDirectory: $(ENVIRONMENTS_DIRECTORY)
+        script: |
+          #!/bin/bash
+          set -e
+  
+          # Get the repository name
+          targetRepositoryFull=$(git config --get remote.origin.url)
+          targetRepository="${targetRepositoryFull##*/}"
+          if [ -z "${targetRepository}" ]; then
+            echo "##[error] Variable targetRepository must not be empty!"
+            exit 1
+          fi
+  
+          # Get the branch name
+          targetBranchName="${{ parameters.environmentBranch }}"
+          if [ -z "${targetBranchName}" ]; then
+            echo "##[error] Variable targetBranchName must not be empty!"
+            exit 1
+          fi
+  
+          cat >> "$(MD_CONFIG_FILE)" <<EOF
+  
+          # Repository
+              TARGET_REPOSITORY:                    ${targetRepository}
+              TARGET_BRANCH_NAME:                   ${targetBranchName}
+  
+          EOF
+          echo "##vso[task.setvariable variable=TARGET_REPOSITORY]${targetRepository}"
+          echo "##vso[task.setvariable variable=TARGET_BRANCH_NAME]${targetBranchName}"
+    - task: Bash@3
+      timeoutInMinutes: 1
+      displayName: "Configure Git"
+      env:
+        PR_USER_NAME: "ISH-CD"
+        PR_USER_EMAIL: "intershop@intershop.com"
+      inputs:
+        workingDirectory: $(ENVIRONMENTS_DIRECTORY)
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+  
+          git config \
+            --global user.email ${PR_USER_EMAIL}
+          git config \
+            --global user.name ${PR_USER_NAME}
+  
+    - task: Bash@3
+      timeoutInMinutes: 5
+      displayName: "Create new branch"
+      env:
+        BRANCH_NAME: $(BRANCH_NAME)
+      inputs:
+        targetType: 'inline'
+        workingDirectory: $(ENVIRONMENTS_DIRECTORY)
+        script: |
+          #!/bin/bash
+          set -e
+  
+          # Create a new branch
+          echo "Create a new branch ${BRANCH_NAME}"
+          git checkout -b "${BRANCH_NAME}"
+          # Stage all files
+          git add -A
+          # Git status
+          gitStatus=$(git status --porcelain | head -1)
+          echo "gitStatus: ${gitStatus}"
+
+          cat >> "$(MD_CONFIG_FILE)" <<EOF
+  
+          # Git
+              gitStatus:                            ${gitStatus}
+  
+          EOF
+  
+          echo "##vso[task.setvariable variable=GIT_STATUS]${gitStatus}"   
+    
+    - task: Bash@3
+      timeoutInMinutes: 5
+      name: "Create_PR"
+      condition: and(succeeded(), eq('${{ parameters.prCreatePullRequest }}', 'true'), ne(variables['GIT_STATUS'], ''))
+      displayName: "Create Pull Request"
+      env:
+        BRANCH_NAME: $(BRANCH_NAME)
+        TARGET_BRANCH_NAME: $(TARGET_BRANCH_NAME)
+        TARGET_REPOSITORY: $(TARGET_REPOSITORY)
+        PR_DELETE_SOURCE_BRANCH: ${{ parameters.prDeleteSourceBranch }}
+        PR_REVIEWERS: ${{ parameters.prReviewers }}
+        PR_SQUASH: ${{ parameters.prSquash }}
+        PR_AUTOCOMPLETE: ${{ parameters.prAutoComplete }}
+      inputs:
+        targetType: 'inline'
+        workingDirectory: $(ENVIRONMENTS_DIRECTORY)
+        script: |
+          #!/bin/bash
+          set -e
+  
+          # az devops config
+          az config set extension.use_dynamic_install=yes_without_prompt
+          echo $(System.AccessToken) | az devops login
+          az devops configure \
+            --defaults organization=$(System.CollectionUri) project=$(System.TeamProject) \
+            --use-git-aliases true
+  
+          # Commit the changes
+          git commit -m "deployment $(Build.BuildNumber) - ${BRANCH_NAME}"
+          git push --set-upstream origin ${BRANCH_NAME}
+
+          
+          pr_parameters=""
+          # Set reviewers parameter
+          if [ ! -z "${PR_REVIEWERS}" ]; then
+            pr_parameters="${pr_parameters} --reviewers \"${PR_REVIEWERS}\""
+          fi
+
+          # Set the delete-source-branch parameter
+          if [ "${PR_DELETE_SOURCE_BRANCH}" = "True" ] ; then
+            pr_parameters="${pr_parameters} --delete-source-branch true"
+          fi
+
+          # Set the squash parameter
+          if [ "${PR_SQUASH}" = "True" ] ; then
+            pr_parameters="${pr_parameters} --squash true"
+          fi
+
+          # Set the auto-complete parameter
+          if [ "${PR_AUTOCOMPLETE}" = "True" ] ; then
+            pr_parameters="${pr_parameters} --auto-complete true"
+          fi
+
+          echo "parameter: ${pr_parameters}"
+          
+          prResponse=$(az repos pr create \
+            --project $(System.TeamProject) \
+            --repository ${TARGET_REPOSITORY} \
+            --target-branch ${TARGET_BRANCH_NAME} \
+            --source-branch ${BRANCH_NAME} \
+            --title "deployment $(Build.BuildNumber) - ${BRANCH_NAME}" \
+            ${pr_parameters} \
+            -o json)
+          
+    
+          echo $prResponse
+          prNum=$(echo $prResponse | jq '.pullRequestId')
+          if [ -z "${prNum}" ]; then
+            echo "##[error] Variable prNum must not be empty!"
+            exit 1
+          fi
+  
+          echo "prNum="$prNum
+
+          cat >> "$(MD_CONFIG_FILE)" <<EOF
+  
+          # PullRequest
+              prNum:                                ${prNum}
+              pr_parameters:                        ${pr_parameters}
+  
+          EOF
+          echo "##vso[task.setvariable variable=PR_NUM]$prNum"
+          echo "##vso[task.setvariable variable=PR_NUM;isOutput=true]$prNum"
+          
+    - task: Bash@3
+      timeoutInMinutes: 1
+      condition: always()
+      continueOnError: true
+      displayName: "Provide pipeline configuration"
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+          echo "##vso[task.uploadsummary]$(MD_CONFIG_FILE)"
+  
+    - task: Bash@3
+      timeoutInMinutes: 1
+      condition: always()
+      continueOnError: true
+      displayName: "Provide patch result"
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+          echo "##vso[task.uploadsummary]$(MD_PATCH_FILE)"

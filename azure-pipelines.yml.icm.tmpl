@@ -1,0 +1,122 @@
+# Define, when the pipeline should be triggered.
+# See https://docs.microsoft.com/en-us/azure/devops/pipelines/repos/azure-repos-git?view=azure-devops&tabs=yaml#ci-triggers
+trigger: none
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+appendCommitMessageToRunName: false
+
+resources:
+  pipelines:
+  - pipeline: <icm-ci-pipeline>
+    source: <icm-ci-pipeline>
+    trigger:
+      branches:
+        include:
+        # Trigger by branch pipeline
+        - master
+        - develop
+        - release/*
+        - feature/*
+        - hotfix/*
+        # Trigger by tag pipeline
+        - refs/tags/version/*
+
+  repositories:
+    - repository: <environments-repository>
+      type: git
+      name: <environments-repository>
+      ref: master
+    - repository: cd-partner-devops
+      type: github
+      endpoint: INTERSHOP_GITHUB
+      name: intershop/cd-partner-devops
+      ref: main
+
+variables:
+  # Library icm11-build-configuration is provided by Intershops DevOps Environment. It provides
+  # the following variables:
+  #  - BUILD_AGENT_POOL:                  name of the build agent pool
+  #  - REPO_SERVICE_CONNECTION:           service connection to the customer ACR
+  #  - REPO_PATH:                         host name and path of the customer ACR
+  #  - INTERSHOP_REPO_SERVICE_CONNECTION: service connection to the Intershop container registry
+  #  - INTERSHOP_REPO_PATH:               host name and path of the Intershop container registry
+  #  - ARTIFACT_FEED                      name of the icm artifacts feed
+  - group: icm11-build-configuration
+
+#
+# The CD process can be very individual.
+# The template has numerous parameters to configure the behavior separately for each environment.
+#
+
+#
+# In the following example, each change is incorporated into the Int environment without any restrictions.
+#
+stages:
+- stage: CD_int
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        product: <product>
+        env: int
+        environmentPath: <environments-repository>
+        triggerPipelineName: <icm-ci-pipeline>
+        versionFilePath: <path-to-the-yaml-file-in-int-environments-repository>
+#
+# Subsequently, the CD_uat pipeline stage will be initiated. 
+# It is dependent on the CD_int stage and must first be approved by selected users. 
+# During PR creation, reviewers are assigned and the PR-Auto-complete function is deactivated.
+#
+- stage: CD_uat
+  dependsOn:
+    - CD_int
+  jobs:
+    - job: waitForValidation
+      displayName: Wait for external validation
+      pool: server
+      timeoutInMinutes: 43200 # job times out in 30 days
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 43200 # task times out in 30 day
+        inputs:
+          notifyUsers: |
+            userc@intershop.com
+          instructions: 'Please validate uat'
+          onTimeout: 'reject'
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        product: <product>
+        env: uat
+        environmentPath: <environments-repository>
+        triggerPipelineName: <icm-ci-pipeline>
+        versionFilePath: <path-to-the-yaml-file-in-uat-environments-repository>
+        prReviewers: userA@intershop.de,userb@intershop.de
+        prAutoComplete: false
+
+- stage: CD_prd
+  dependsOn:
+    - CD_uat
+  jobs:
+    - job: waitForValidation
+      displayName: Wait for external validation
+      pool: server
+      timeoutInMinutes: 43200 # job times out in 30 days
+      steps:
+      - task: ManualValidation@0
+        timeoutInMinutes: 43200 # task times out in 30 day
+        inputs:
+          notifyUsers: |
+            userc@intershop.com
+          instructions: 'Please validate PRD'
+          onTimeout: 'reject'
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        product: <product>
+        env: prd
+        environmentPath: <environments-repository>
+        triggerPipelineName: <icm-ci-pipeline>
+        versionFilePath: <path-to-the-yaml-file-in-prd-environments-repository>
+        prReviewers: userA@intershop.de,userb@intershop.de
+        prAutoComplete: false
