@@ -4,38 +4,37 @@
 ################################################################################
 parameters:
 
-  # Has to be set, if ci-job-template.yml is used in a loop, for two reasons:
-  # - to make each job-name unique,
-  # - to extend names of files, which are published in extensions.
-  # For this reason id must consitst of characters, numbers and _ only.
+  # Identifies each job uniquely when ci-job-template.yml is used in a loop. 
+  # Can only contain characters, numbers, and underscores.
+  # Also used to extend names of files published in extensions.
 - name: id
   type: string
   default: ''
   
-  # Enables an easy integration with custom jobs. The parameter will be passed
-  # as is to the 'dependsOn' property of the job.
+  # Enables an easy integration with custom jobs. 
+  # The parameter will be passed as is to the 'dependsOn' property of the job.
 - name: dependsOn
   type: string
   default: ''
 
-  # Enables an easy integration with custom jobs. The parameter will be passed
-  # as is to the 'condition' property of the job.
+  # Enables an easy integration with custom jobs. 
+  # The parameter will be passed as is to the 'condition' property of the job.
 - name: condition
   type: string
   default: ''
 
-  # Every partner has it's own agent-pool, therefore the name of the pool cannot
-  # be hardcoded in the pipeline template.
+  # Specifies the name of the agent pool.
+  # The pool name can't be hardcoded in the pipeline template.
 - name: agentPool
   type: string
   default: ''
 
-  # Maximum job execution time
+  # Specifies the maximum job execution time in minutes.
 - name: jobTimeoutInMinutes
   type: number
   default: 300
 
-  # 'true' if future jobs should run even if this job fails; defaults to 'false'
+  # Specifies whether future jobs should run even if this job fails; defaults to 'false'.
 - name: jobContinueOnError
   type: boolean
   default: false
@@ -46,6 +45,7 @@ parameters:
   default: 
   values:
   - icm
+  - pwa
 
   # Name of the environment.
 - name: env
@@ -78,7 +78,7 @@ parameters:
   # Name of the file to be analysed
 - name: imagePropertiesFile
   type: string
-  default: imageProperties
+  default: imageProperties.yaml
 
   # Path of version file to be overwritten in the environment repository
   # For example: int/icm/version.yaml
@@ -111,6 +111,38 @@ parameters:
   type: boolean
   default: true
 
+  # Decide whether to use a predefined registry or the registry value from the imagePropertiesFile.
+  # defaults to 'false'
+- name: usePredefinedRegistry
+  type: boolean
+  default: false
+
+  # Decide whether to use a predefined pullPolicy.
+  # defaults to 'false'
+- name: usePredefinedPullPolicy
+  type: boolean
+  default: false
+
+  # Predefined PullPolicy
+- name: predefinedPullPolicy
+  type: string
+  default: IfNotPresent
+
+#
+# ICM specific parameter
+#
+
+#
+# PWA specific parameter
+#
+- name: pwaPredefinedSsrRegistry
+  type: string
+  default: ''
+
+- name: pwaPredefinedNginxRegistry
+  type: string
+  default: ''
+
 jobs:
 - job: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
   pool: '${{ parameters.agentPool }}'
@@ -131,6 +163,10 @@ jobs:
       value: $(Pipeline.Workspace)/config_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
     - name: MD_PATCH_FILE
       value: $(Pipeline.Workspace)/cd-patched-file_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
+    - name: YQ_VERSION
+      value: v4.33.3
+    - name: YQ_BINARY
+      value: yq_linux_amd64
   
   steps:
     - download: ${{ parameters.triggerPipelineName }}
@@ -168,6 +204,9 @@ jobs:
               prReviewers:                ${{ parameters.prReviewers }}
               prAutoComplete:             ${{ parameters.prAutoComplete }}
               prSquash:                   ${{ parameters.prSquash }}
+              usePredefinedRegistry:      ${{ parameters.usePredefinedRegistry }}
+              usePredefinedPullPolicy:    ${{ parameters.usePredefinedPullPolicy }}
+              predefinedPullPolicy:       ${{ parameters.predefinedPullPolicy }}
 
           # Pipeline
               pipelineID:                 $(resources.pipeline.${{ parameters.triggerPipelineName }}.pipelineID)
@@ -176,6 +215,13 @@ jobs:
               runURI:                     $(resources.pipeline.${{ parameters.triggerPipelineName }}.runURI)
               sourceBranch:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceBranch)
               sourceCommit:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)
+          
+          # ICM
+
+          # PWA
+            ssrRegistry:                  ${{ parameters.pwaPredefinedSsrRegistry }}
+            nginxRegistry:                ${{ parameters.pwaPredefinedNginxRegistry }}
+
   
           EOF
       
@@ -233,6 +279,9 @@ jobs:
 
     - task: Bash@3
       displayName: 'Install yq'
+      env:
+        VERSION: $(YQ_VERSION)
+        BINARY: $(YQ_BINARY)
       timeoutInMinutes: 2
       inputs:
         targetType: 'inline'
@@ -240,117 +289,219 @@ jobs:
           #!/bin/bash
           set -e
   
-          sudo wget https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -O /usr/bin/yq
+          sudo wget https://github.com/mikefarah/yq/releases/download/${VERSION}/${BINARY} -O /usr/bin/yq
           sudo chmod +x /usr/bin/yq
-  
+
     - task: Bash@3
       timeoutInMinutes: 5
-      displayName: "Parse the file"
+      condition: and(succeeded(), eq('${{ parameters.product }}', 'pwa'))
+      displayName: "PWA: Parse the file"
       env:
         IMAGE_ARTIFACT_FILE_PATH: $(IMAGE_ARTIFACT_FILE_PATH)
         PATCH_FILE_FULL_PATH: $(PATCH_FILE_FULL_PATH)
         BUILD_BUILD_NUMBER: $(Build.BuildNumber)
+        USE_PREDEFINED_REGISTRY: ${{ parameters.usePredefinedRegistry }}
+        PREDEFINED_REGISTRY_SSR: ${{ parameters.pwaPredefinedSsrRegistry }}
+        PREDEFINED_REGISTRY_NGNIX: ${{ parameters.pwaPredefinedNginxRegistry }}
       inputs:
         targetType: 'inline'
         script: |
           #!/bin/bash
           set -e
+
+          # Read the contents of the YAML file and create an array of image mappings
+          readarray imagesMapping < <(yq e -o=j -I=0 '.images[]' ${IMAGE_ARTIFACT_FILE_PATH} )
+
+          # Iterate over each image mapping in the array
+          for image in "${imagesMapping[@]}"; do
+              echo "#####"
+              # Parse the values for the tag, type, name, and registry fields from the current image mapping
+              IMAGE_TAG=$(echo "$image" | yq e '.tag')
+              IMAGE_TYPE=$(echo "$image" | yq e '.type')
+              IMAGE_NAME=$(echo "$image" | yq e '.name')
+              IMAGE_REGISTRY=$(echo "$image" | yq e '.registry')
+
+              # Set buildValueVersion
+              buildValueVersion=$IMAGE_TAG
+              
+              echo "Image: ${IMAGE_TYPE} | ${IMAGE_NAME} | ${IMAGE_TAG} | ${IMAGE_REGISTRY} "
+
+              # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
+              if [[ -z "$IMAGE_TAG" || -z "$IMAGE_TYPE" || -z "$IMAGE_NAME" || -z "$IMAGE_REGISTRY" ]]; then
+                echo "Error: Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
+                exit 1
+              fi
+
+              # Check if IMAGE_TYPE is "ssr" or "nginx"
+              if [[ "$IMAGE_TYPE" == "ssr" ]]; then
+
+                # Replace the tag in '.spec.values.image.tag'
+                TAG="${IMAGE_TAG}" \
+                yq -i '.spec.values.image.tag = strenv(TAG)' ${PATCH_FILE_FULL_PATH}
+
+                # If USE_PREDEFINED_REGISTRY is true, than use PREDEFINED_REGISTRY_SSR as registry
+                if [[ "$USE_PREDEFINED_REGISTRY" == "True" ]]; then
+                  FINAL_REPOSITORY="${PREDEFINED_REGISTRY_SSR}/${IMAGE_NAME}"
+                else
+                  FINAL_REPOSITORY="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+                fi
+
+                # Replace the repository in '.spec.values.image.repository'
+                REPOSITORY="${FINAL_REPOSITORY}" \
+                yq -i '.spec.values.image.repository = strenv(REPOSITORY)' ${PATCH_FILE_FULL_PATH}
+
+
+              elif [[ "$IMAGE_TYPE" == "nginx" ]]; then
+
+                # Replace the tag in '.spec.values.cache.image.tag'
+                TAG="${IMAGE_TAG}" \
+                yq -i '.spec.values.cache.image.tag = strenv(TAG)' ${PATCH_FILE_FULL_PATH}
+
+                # If USE_PREDEFINED_REGISTRY is true, than use PREDEFINED_REGISTRY_NGNIX as registry
+                if [[ "$USE_PREDEFINED_REGISTRY" == "True" ]]; then
+                  FINAL_REPOSITORY="${PREDEFINED_REGISTRY_NGNIX}/${IMAGE_NAME}"
+                else
+                  FINAL_REPOSITORY="${IMAGE_REGISTRY}/${IMAGE_NAME}"
+                fi
+
+                # Replace the repository in '.spec.values.cache.image.repository'
+                REPOSITORY="${FINAL_REPOSITORY}" \
+                yq -i '.spec.values.cache.image.repository = strenv(REPOSITORY)' ${PATCH_FILE_FULL_PATH}
+
+              else
+                echo "Unknown Image Type: ${IMAGE_TYPE}"
+              fi
+          done
+
+          cat > "$(MD_PATCH_FILE)" <<EOF
   
+            \`\`\`
+  
+              $(cat ${PATCH_FILE_FULL_PATH})
+  
+            \`\`\`
+          EOF
+
+          # Calc the new buildNumber
+          buildNumberPart="${BUILD_BUILD_NUMBER%%_*}"
+          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${buildValueVersion}"
+          echo "##vso[build.addbuildtag]${{ parameters.product }}"
+
+    - task: Bash@3
+      timeoutInMinutes: 5
+      condition: and(succeeded(), eq('${{ parameters.product }}', 'icm'))
+      displayName: "ICM: Parse the file"
+      env:
+        IMAGE_ARTIFACT_FILE_PATH: $(IMAGE_ARTIFACT_FILE_PATH)
+        PATCH_FILE_FULL_PATH: $(PATCH_FILE_FULL_PATH)
+        BUILD_BUILD_NUMBER: $(Build.BuildNumber)
+        USE_PREDEFINED_PULL_POLICY: ${{ parameters.usePredefinedPullPolicy }}
+        PREDEFINED_PULL_POLICY: ${{ parameters.predefinedPullPolicy }}
+      inputs:
+        targetType: 'inline'
+        script: |
+          #!/bin/bash
+          set -e
+
           # Create a temporary file
           tmpfile=$(mktemp)
 
           # Create valid customizations list
           validCustomizationsList="[]"
-  
-          # Remove spaces from the file and write the result to the temporary file
-          tr -d ' ' < "${IMAGE_ARTIFACT_FILE_PATH}" > "${tmpfile}"
-  
-          # Copy the temporary file back to the original file
-          cp "${tmpfile}" "${IMAGE_ARTIFACT_FILE_PATH}"
-  
-          # Use yq to delete the values under the spec.values.icm-as.customizations key
-          # yq -i 'del(.spec.values.icm-as.customizations.*)' ${PATCH_FILE_FULL_PATH}
-  
-          # Check if the "build" key exists in the IMAGE_ARTIFACT_FILE_PATH file
-          if ! grep -q '^build=' ${IMAGE_ARTIFACT_FILE_PATH}; then
-              echo "##[error] The 'build' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+
+          # Parse values from IMAGE_ARTIFACT_FILE_PATH
+          IMAGE_TAG=$(yq '.images[0].tag' ${IMAGE_ARTIFACT_FILE_PATH})
+          IMAGE_TYPE=$(yq '.images[0].type' ${IMAGE_ARTIFACT_FILE_PATH})
+          IMAGE_NAME=$(yq '.images[0].name' ${IMAGE_ARTIFACT_FILE_PATH})
+          IMAGE_REGISTRY=$(yq '.images[0].registry' ${IMAGE_ARTIFACT_FILE_PATH})
+
+          # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
+          if [[ -z "$IMAGE_TAG" || -z "$IMAGE_TYPE" || -z "$IMAGE_NAME" || -z "$IMAGE_REGISTRY" ]]; then
+              echo "Error: Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
               exit 1
           fi
-  
-          # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
-          buildValue=$(grep '^build=' ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
 
           # Replaces all underscores (_) in a string with hyphens (-)
-          buildValueOnlyHyphens="${buildValue//_/-}"
+          IMAGE_NAME_ONLY_HYPHENS="${IMAGE_NAME//_/-}"
 
-          # Add buildValueOnlyHyphens to validCustomizationsList
-          validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${buildValueOnlyHyphens}"  -rc '. + [$element]')"
+          # Add IMAGE_NAME_ONLY_HYPHENS to validCustomizationsList
+          validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${IMAGE_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
 
-          # Check if the "<buildValue>.version" key exists in the IMAGE_ARTIFACT_FILE_PATH file
-          if ! grep -q "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH}; then
-              echo "##[error] The '${buildValue}.version' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
-              exit 1
+          # Add the ${IMAGE_NAME} version to .spec.values.icm-as.customizations.<customization>.repository
+          repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
+          repositoryTag="\${project_container_registry}/${IMAGE_NAME}:${IMAGE_TAG}" \
+          yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' ${PATCH_FILE_FULL_PATH}
+
+          # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
+          if [[ "$USE_PREDEFINED_PULL_POLICY" == "True" ]]; then
+            repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
+              pullPolicy="${PREDEFINED_PULL_POLICY}" \
+              yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' ${PATCH_FILE_FULL_PATH}
           fi
-  
-          # Get the value of the "build" key from the IMAGE_ARTIFACT_FILE_PATH file
-          buildValueVersion=$(grep "^${buildValue}.version=" ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
-          # Add the ${buildValue} version to .spec.values.icm-as.customizations.<customization>.repository
-          repositoryName="${buildValueOnlyHyphens}" \
-            repositoryTag="\${project_container_registry}/${buildValue}:${buildValueVersion}" \
-            yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
-            ${PATCH_FILE_FULL_PATH}
-  
+
           # Check if the "build.with" key exists in the IMAGE_ARTIFACT_FILE_PATH file
-          if ! grep -q '^build.with=' ${IMAGE_ARTIFACT_FILE_PATH}; then
+          if ! yq '.images[0].buildWith != null' ${IMAGE_ARTIFACT_FILE_PATH} > /dev/null 2>&1; then
               echo "##[error] The 'build.with' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
               exit 1
           fi
-  
-          # Get the value of the "build.with" key from the IMAGE_ARTIFACT_FILE_PATH file
-          buildWithValue=$(grep '^build.with=' ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
-  
-          # Iterate over the comma-separated values in the "build.with" key
-          IFS=',' read -ra build_with_array  <<< ${buildWithValue}
-          for container in "${build_with_array[@]}"; do
-              echo "Value in 'build.with' key: ${container}"
-  
-              # Check if the "<$container>.version" key exists in the IMAGE_ARTIFACT_FILE_PATH file
-              if ! grep -q "^${container}.version=" ${IMAGE_ARTIFACT_FILE_PATH}; then
-                  echo "##[error] The '${container}.version' key does not exist in the IMAGE_ARTIFACT_FILE_PATH file."
+
+          # Read the contents of the YAML file and create an array of image mappings
+          readarray imagesMapping < <(yq e -o=j -I=0 '.images[0].buildWith[]' ${IMAGE_ARTIFACT_FILE_PATH} )
+
+          # Iterate over each image mapping in the array
+          for image in "${imagesMapping[@]}"; do
+              echo "#####"
+              # Parse the values for the tag, type, name, and registry fields from the current image mapping
+              IMAGE_BUILDWITH_TAG=$(echo "$image" | yq e '.tag')
+              IMAGE_BUILDWITH_TYPE=$(echo "$image" | yq e '.type')
+              IMAGE_BUILDWITH_NAME=$(echo "$image" | yq e '.name')
+              IMAGE_BUILDWITH_REGISTRY=$(echo "$image" | yq e '.registry')
+
+              echo "Image: ${IMAGE_BUILDWITH_TYPE} | ${IMAGE_BUILDWITH_NAME} | ${IMAGE_BUILDWITH_TAG} | ${IMAGE_BUILDWITH_REGISTRY}"
+
+              # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
+              if [[ -z "$IMAGE_BUILDWITH_TAG" || -z "$IMAGE_BUILDWITH_TYPE" || -z "$IMAGE_BUILDWITH_NAME" || -z "$IMAGE_BUILDWITH_REGISTRY" ]]; then
+                  echo "Error: Invalid image mapping. IMAGE_BUILDWITH_TAG, IMAGE_BUILDWITH_TYPE, IMAGE_BUILDWITH_NAME or IMAGE_BUILDWITH_REGISTRY is empty or null."
                   exit 1
               fi
-  
-              # Get the value of the "<$container>.version" key from the IMAGE_ARTIFACT_FILE_PATH file
-              containerVersion=$(grep "^${container}.version=" ${IMAGE_ARTIFACT_FILE_PATH} | cut -d'=' -f2)
-  
+
               # Add the icm-as version to spec.values.icm-as.image.tag
-              if [ "${container}" == "icm-as" ]; then
-                version="${containerVersion}" \
+              if [ "${IMAGE_BUILDWITH_NAME}" == "icm-as" ]; then
+              version="${IMAGE_BUILDWITH_TAG}" \
                   yq -i '.spec.values.icm-as.image.tag  = strenv(version)' ${PATCH_FILE_FULL_PATH}
-  
+
               # Add the icm-webadapteragent version to spec.values.icm-web.agent.image.repository  
-              elif [ "${container}" == "icm-webadapteragent" ]; then
-                repositoryValue="\${icm_container_registry}/${container}:${containerVersion}" \
+              elif [ "${IMAGE_BUILDWITH_NAME}" == "icm-webadapteragent" ]; then
+              repositoryValue="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
                   yq -i '.spec.values.icm-web.agent.image.repository = strenv(repositoryValue)' ${PATCH_FILE_FULL_PATH}
-  
+
               # Add the icm-webadapter version to spec.values.icm-web.webadapter.image.repository  
-              elif [ "${container}" == "icm-webadapter" ]; then
-                repositoryValue="\${icm_container_registry}/${container}:${containerVersion}" \
+              elif [ "${IMAGE_BUILDWITH_NAME}" == "icm-webadapter" ]; then
+              repositoryValue="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
                   yq -i '.spec.values.icm-web.webadapter.image.repository = strenv(repositoryValue)' ${PATCH_FILE_FULL_PATH}
-  
+
               # Add all other customizations versions to .spec.values.icm-as.customizations.<customization>.repository
               else
 
-                # Replaces all underscores (_) in a string with hyphens (-)
-                containerOnlyHyphens="${container//_/-}"
+                  # Replaces all underscores (_) in a string with hyphens (-)
+                  IMAGE_BUILDWITH_NAME_ONLY_HYPHENS="${IMAGE_BUILDWITH_NAME//_/-}"
 
-                # Add containerOnlyHyphens to validCustomizationsList
-                validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${containerOnlyHyphens}"  -rc '. + [$element]')"
+                  # Add IMAGE_BUILDWITH_NAME_ONLY_HYPHENS to validCustomizationsList
+                  validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
 
-                repositoryName="${containerOnlyHyphens}" \
-                  repositoryTag="\${icm_container_registry}/${container}:${containerVersion}" \
-                  yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
-                  ${PATCH_FILE_FULL_PATH}
+                  repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
+                      repositoryTag="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
+                      yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
+                      ${PATCH_FILE_FULL_PATH}
+
+                  # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
+                  if [[ "$USE_PREDEFINED_PULL_POLICY" == "True" ]]; then
+                    repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
+                      pullPolicy="${PREDEFINED_PULL_POLICY}" \
+                      yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' \
+                      ${PATCH_FILE_FULL_PATH}
+                  fi
+                  
               fi
           done
 
@@ -361,12 +512,12 @@ jobs:
           echo "validCustomizationsList = ${validCustomizationsList}"
 
           for customization in $(echo "${allCustomizations}" | jq -r '.[]'); do
-            if [[ -z $(echo "${validCustomizationsList}" | jq --arg el "${customization}" '. | index($el) // empty') ]]; then
-              
-              echo "Remove the customization: ${customization}"
-              invalidCustomization="${customization}" \
-                yq -i 'del(.spec.values.icm-as.customizations.[env(invalidCustomization)])' ${PATCH_FILE_FULL_PATH}
-            fi
+              if [[ -z $(echo "${validCustomizationsList}" | jq --arg el "${customization}" '. | index($el) // empty') ]]; then
+                  
+                  echo "Remove the customization: ${customization}"
+                  invalidCustomization="${customization}" \
+                  yq -i 'del(.spec.values.icm-as.customizations.[env(invalidCustomization)])' ${PATCH_FILE_FULL_PATH}
+              fi
           done
           
           # Copy the patched ${PATCH_FILE_FULL_PATH} file
@@ -382,14 +533,14 @@ jobs:
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
           # Customization
-              image:                    ${buildValue}
-              tag:                      ${buildValueVersion}
+              image:                    ${IMAGE_NAME}
+              tag:                      ${IMAGE_TAG}
   
           EOF
 
           # Calc the new buildNumber
           buildNumberPart="${BUILD_BUILD_NUMBER%%_*}"
-          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${buildValue}_${buildValueVersion}"
+          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${IMAGE_NAME}_${IMAGE_TAG}"
           echo "##vso[build.addbuildtag]${{ parameters.product }}"
   
     - task: Bash@3
@@ -511,7 +662,6 @@ jobs:
   
           # Git
               gitStatus:                            ${gitStatus}
-  
           EOF
   
           echo "##vso[task.setvariable variable=GIT_STATUS]${gitStatus}"   

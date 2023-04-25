@@ -11,8 +11,8 @@ appendCommitMessageToRunName: false
 
 resources:
   pipelines:
-  - pipeline: <icm-ci-pipeline>
-    source: <icm-ci-pipeline>
+  - pipeline: <pwa-ci-pipeline>
+    source: <pwa-ci-pipeline>
     trigger:
       branches:
         include:
@@ -34,18 +34,16 @@ resources:
       type: github
       endpoint: INTERSHOP_GITHUB
       name: intershop/cd-partner-devops
-      ref: refs/heads/stable-icm/v1
+      ref: refs/heads/stable-pwa/v1
 
 variables:
-  # Library icm11-build-configuration is provided by Intershops DevOps Environment. It provides
+  # Library pwa-build-configuration is provided by Intershops DevOps Environment. It provides
   # the following variables:
   #  - BUILD_AGENT_POOL:                  name of the build agent pool
   #  - REPO_SERVICE_CONNECTION:           service connection to the customer ACR
   #  - REPO_PATH:                         host name and path of the customer ACR
-  #  - INTERSHOP_REPO_SERVICE_CONNECTION: service connection to the Intershop container registry
-  #  - INTERSHOP_REPO_PATH:               host name and path of the Intershop container registry
-  #  - ARTIFACT_FEED                      name of the icm artifacts feed
-  - group: icm11-build-configuration
+  - group: pwa-build-configuration
+
 
 #
 # The CD process can be very individual.
@@ -62,9 +60,9 @@ stages:
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
         env: int
-        product: icm
+        product: pwa
         environmentPath: <environments-repository>
-        triggerPipelineName: <icm-ci-pipeline>
+        triggerPipelineName: <pwa-ci-pipeline>
         versionFilePath: <path-to-the-yaml-file-in-int-environments-repository>
 #
 # Subsequently, the CD_uat pipeline stage will be initiated. 
@@ -90,10 +88,10 @@ stages:
 #    - template: cd-job-template.yml@cd-partner-devops
 #      parameters:
 #        agentPool: $(BUILD_AGENT_POOL)
-#        product: icm
+#        product: pwa
 #        env: uat
 #        environmentPath: <environments-repository>
-#        triggerPipelineName: <icm-ci-pipeline>
+#        triggerPipelineName: <pwa-ci-pipeline>
 #        versionFilePath: <path-to-the-yaml-file-in-uat-environments-repository>
 #        prReviewers: userA@intershop.de,userb@intershop.de
 #        prAutoComplete: false
@@ -117,10 +115,10 @@ stages:
 #    - template: cd-job-template.yml@cd-partner-devops
 #      parameters:
 #        agentPool: $(BUILD_AGENT_POOL)
-#        product: icm
+#        product: pwa
 #        env: prd
 #        environmentPath: <environments-repository>
-#        triggerPipelineName: <icm-ci-pipeline>
+#        triggerPipelineName: <pwa-ci-pipeline>
 #        versionFilePath: <path-to-the-yaml-file-in-prd-environments-repository>
 #        prReviewers: userA@intershop.de,userb@intershop.de
 #        prAutoComplete: false
