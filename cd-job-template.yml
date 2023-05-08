@@ -4,7 +4,7 @@
 ################################################################################
 parameters:
 
-  # Identifies each job uniquely when ci-job-template.yml is used in a loop. 
+  # Identifies each job uniquely when 'ci-job-template.yml' is used in a loop. 
   # Can only contain characters, numbers, and underscores.
   # Also used to extend names of files published in extensions.
 - name: id
@@ -24,7 +24,7 @@ parameters:
   default: ''
 
   # Specifies the name of the agent pool.
-  # The pool name can't be hardcoded in the pipeline template.
+  # The pool name cannot be hardcoded in the pipeline template.
 - name: agentPool
   type: string
   default: ''
@@ -34,11 +34,12 @@ parameters:
   type: number
   default: 300
 
-  # Specifies whether future jobs should run even if this job fails; defaults to 'false'.
+  # Specifies whether future jobs should run even if this job fails.
 - name: jobContinueOnError
   type: boolean
   default: false
 
+  # Specifies the product
   # Each product requires an individual process.
 - name: product
   type: string
@@ -64,29 +65,29 @@ parameters:
   type: string
   default: master
 
-  # Name of the Ci pipeline
+  # Name of the CI pipeline
   # The branch name is given in "resources.pipelines".
 - name: triggerPipelineName
   type: string
   default:
 
-  # Name of the ci-pipeline artifact
+  # Name of the CI pipeline artifact.
 - name: pipelineArtifactName
   type: string
   default: image
 
-  # Name of the file to be analysed
+  # Name of the file to be analysed.
 - name: imagePropertiesFile
   type: string
   default: imageProperties.yaml
 
-  # Path of version file to be overwritten in the environment repository
+  # Path of version file to be overwritten in the environment repository.
   # For example: int/icm/version.yaml
 - name: versionFilePath
   type: string
   default:
 
-  # PullRequest creation
+  # Specifies whether a PullRequest should be created.
 - name: prCreatePullRequest
   type: boolean
   default: true
@@ -112,13 +113,11 @@ parameters:
   default: true
 
   # Decide whether to use a predefined registry or the registry value from the imagePropertiesFile.
-  # defaults to 'false'
 - name: usePredefinedRegistry
   type: boolean
   default: false
 
   # Decide whether to use a predefined pullPolicy.
-  # defaults to 'false'
 - name: usePredefinedPullPolicy
   type: boolean
   default: false
@@ -127,6 +126,13 @@ parameters:
 - name: predefinedPullPolicy
   type: string
   default: IfNotPresent
+
+  # Regular expression pattern that the ImageTag must satisfy.
+  # This pattern ensures that the ImageTag is a valid Docker image tag and 
+  # can be used to process only Docker Tags with this particular pattern.
+- name: imageTagPattern
+  type: string
+  default: '^[^\s][[:graph:]]*$'
 
 #
 # ICM specific parameter
@@ -195,6 +201,7 @@ jobs:
               pipelineArtifactName:       ${{ parameters.pipelineArtifactName }}
               imagePropertiesFile:        ${{ parameters.imagePropertiesFile }}
               environmentPath:            ${{ parameters.environmentPath }}
+              env:                        ${{ parameters.env }}
               environmentBranch:          ${{ parameters.environmentBranch }}
               versionFilePath:            ${{ parameters.versionFilePath }}
               PATCH_FILE_FULL_PATH:       $(PATCH_FILE_FULL_PATH)
@@ -207,6 +214,7 @@ jobs:
               usePredefinedRegistry:      ${{ parameters.usePredefinedRegistry }}
               usePredefinedPullPolicy:    ${{ parameters.usePredefinedPullPolicy }}
               predefinedPullPolicy:       ${{ parameters.predefinedPullPolicy }}
+              imageTagPattern:            ${{ parameters.imageTagPattern }}
 
           # Pipeline
               pipelineID:                 $(resources.pipeline.${{ parameters.triggerPipelineName }}.pipelineID)
@@ -245,7 +253,7 @@ jobs:
           fi
 
           if [ -z "${{ parameters.env }}" ]; then
-            echo "##[error] Parameter environmentBranch must not be empty!"
+            echo "##[error] Parameter env must not be empty!"
             exit 1
           fi
 
@@ -261,6 +269,11 @@ jobs:
   
           if [ -z "${{ parameters.versionFilePath }}" ]; then
             echo "##[error] Parameter versionFilePath must not be empty!"
+            exit 1
+          fi
+
+          if [ -z "${{ parameters.imageTagPattern }}" ]; then
+            echo "##[error] Parameter imageTagPattern must not be empty!"
             exit 1
           fi
           
@@ -295,7 +308,7 @@ jobs:
     - task: Bash@3
       timeoutInMinutes: 5
       condition: and(succeeded(), eq('${{ parameters.product }}', 'pwa'))
-      displayName: "PWA: Parse the file"
+      displayName: "PWA: Process"
       env:
         IMAGE_ARTIFACT_FILE_PATH: $(IMAGE_ARTIFACT_FILE_PATH)
         PATCH_FILE_FULL_PATH: $(PATCH_FILE_FULL_PATH)
@@ -303,17 +316,23 @@ jobs:
         USE_PREDEFINED_REGISTRY: ${{ parameters.usePredefinedRegistry }}
         PREDEFINED_REGISTRY_SSR: ${{ parameters.pwaPredefinedSsrRegistry }}
         PREDEFINED_REGISTRY_NGNIX: ${{ parameters.pwaPredefinedNginxRegistry }}
+        IMAGE_TAG_PATTERN: ${{ parameters.imageTagPattern }}
       inputs:
         targetType: 'inline'
         script: |
           #!/bin/bash
           set -e
 
+          # PWA process:
+          # The script reads and analyzes the file located at $IMAGE_ARTIFACT_FILE_PATH.
+          # It then checks the tag against the regex pattern defined in $IMAGE_TAG_PATTERN 
+          # and applies the necessary changes to the file located at $PATCH_FILE_FULL_PATH.
+
           # Read the contents of the YAML file and create an array of image mappings
-          readarray imagesMapping < <(yq e -o=j -I=0 '.images[]' ${IMAGE_ARTIFACT_FILE_PATH} )
+          readarray IMAGES_MAPPING < <(yq e -o=j -I=0 '.images[]' ${IMAGE_ARTIFACT_FILE_PATH} )
 
           # Iterate over each image mapping in the array
-          for image in "${imagesMapping[@]}"; do
+          for image in "${IMAGES_MAPPING[@]}"; do
               echo "#####"
               # Parse the values for the tag, type, name, and registry fields from the current image mapping
               IMAGE_TAG=$(echo "$image" | yq e '.tag')
@@ -321,14 +340,14 @@ jobs:
               IMAGE_NAME=$(echo "$image" | yq e '.name')
               IMAGE_REGISTRY=$(echo "$image" | yq e '.registry')
 
-              # Set buildValueVersion
-              buildValueVersion=$IMAGE_TAG
+              # Set BUILD_VALUE_VERSION
+              BUILD_VALUE_VERSION=$IMAGE_TAG
               
               echo "Image: ${IMAGE_TYPE} | ${IMAGE_NAME} | ${IMAGE_TAG} | ${IMAGE_REGISTRY} "
 
               # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
               if [[ -z "$IMAGE_TAG" || -z "$IMAGE_TYPE" || -z "$IMAGE_NAME" || -z "$IMAGE_REGISTRY" ]]; then
-                echo "Error: Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
+                echo "##[error] Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
                 exit 1
               fi
 
@@ -383,31 +402,47 @@ jobs:
           EOF
 
           # Calc the new buildNumber
-          buildNumberPart="${BUILD_BUILD_NUMBER%%_*}"
-          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${buildValueVersion}"
+          BUILD_NUMBER_PART="${BUILD_BUILD_NUMBER%%_*}"
+          echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${BUILD_VALUE_VERSION}"
           echo "##vso[build.addbuildtag]${{ parameters.product }}"
+
+          # Checking whether the Regex tag pattern is fulfilled.
+          if [[ $IMAGE_TAG =~ $IMAGE_TAG_PATTERN ]]; then
+            echo "$IMAGE_TAG fulfills the pattern requirement: $IMAGE_TAG_PATTERN"
+            echo "##vso[task.setvariable variable=VALID_TAG]true"
+          else
+            echo "##vso[task.logissue type=warning;]$IMAGE_TAG does not fulfill the pattern requirement: $IMAGE_TAG_PATTERN"
+            echo "##vso[task.setvariable variable=VALID_TAG]false"
+            exit 0
+          fi
 
     - task: Bash@3
       timeoutInMinutes: 5
       condition: and(succeeded(), eq('${{ parameters.product }}', 'icm'))
-      displayName: "ICM: Parse the file"
+      displayName: "ICM: Process"
       env:
         IMAGE_ARTIFACT_FILE_PATH: $(IMAGE_ARTIFACT_FILE_PATH)
         PATCH_FILE_FULL_PATH: $(PATCH_FILE_FULL_PATH)
         BUILD_BUILD_NUMBER: $(Build.BuildNumber)
         USE_PREDEFINED_PULL_POLICY: ${{ parameters.usePredefinedPullPolicy }}
         PREDEFINED_PULL_POLICY: ${{ parameters.predefinedPullPolicy }}
+        IMAGE_TAG_PATTERN: ${{ parameters.imageTagPattern }}
       inputs:
         targetType: 'inline'
         script: |
           #!/bin/bash
           set -e
 
+          # ICM process:
+          # The script reads and analyzes the file located at $IMAGE_ARTIFACT_FILE_PATH.
+          # It then checks the tag against the regex pattern defined in $IMAGE_TAG_PATTERN 
+          # and applies the necessary changes to the file located at $PATCH_FILE_FULL_PATH.
+
           # Create a temporary file
           tmpfile=$(mktemp)
 
           # Create valid customizations list
-          validCustomizationsList="[]"
+          VALID_CUSTOMIZATIONS_LIST="[]"
 
           # Parse values from IMAGE_ARTIFACT_FILE_PATH
           IMAGE_TAG=$(yq '.images[0].tag' ${IMAGE_ARTIFACT_FILE_PATH})
@@ -417,15 +452,15 @@ jobs:
 
           # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
           if [[ -z "$IMAGE_TAG" || -z "$IMAGE_TYPE" || -z "$IMAGE_NAME" || -z "$IMAGE_REGISTRY" ]]; then
-              echo "Error: Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
+              echo "##[error] Invalid image mapping. IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY is empty or null."
               exit 1
           fi
 
           # Replaces all underscores (_) in a string with hyphens (-)
           IMAGE_NAME_ONLY_HYPHENS="${IMAGE_NAME//_/-}"
 
-          # Add IMAGE_NAME_ONLY_HYPHENS to validCustomizationsList
-          validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${IMAGE_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
+          # Add IMAGE_NAME_ONLY_HYPHENS to VALID_CUSTOMIZATIONS_LIST
+          VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${IMAGE_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
 
           # Add the ${IMAGE_NAME} version to .spec.values.icm-as.customizations.<customization>.repository
           repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
@@ -433,7 +468,7 @@ jobs:
           yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' ${PATCH_FILE_FULL_PATH}
 
           # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
-          if [[ "$USE_PREDEFINED_PULL_POLICY" == "True" ]]; then
+          if [[ "${USE_PREDEFINED_PULL_POLICY}" == "True" ]]; then
             repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
               pullPolicy="${PREDEFINED_PULL_POLICY}" \
               yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' ${PATCH_FILE_FULL_PATH}
@@ -446,10 +481,10 @@ jobs:
           fi
 
           # Read the contents of the YAML file and create an array of image mappings
-          readarray imagesMapping < <(yq e -o=j -I=0 '.images[0].buildWith[]' ${IMAGE_ARTIFACT_FILE_PATH} )
+          readarray IMAGES_MAPPING < <(yq e -o=j -I=0 '.images[0].buildWith[]' ${IMAGE_ARTIFACT_FILE_PATH} )
 
           # Iterate over each image mapping in the array
-          for image in "${imagesMapping[@]}"; do
+          for image in "${IMAGES_MAPPING[@]}"; do
               echo "#####"
               # Parse the values for the tag, type, name, and registry fields from the current image mapping
               IMAGE_BUILDWITH_TAG=$(echo "$image" | yq e '.tag')
@@ -461,7 +496,7 @@ jobs:
 
               # Check if IMAGE_TAG, IMAGE_TYPE, IMAGE_NAME or IMAGE_REGISTRY are empty or null
               if [[ -z "$IMAGE_BUILDWITH_TAG" || -z "$IMAGE_BUILDWITH_TYPE" || -z "$IMAGE_BUILDWITH_NAME" || -z "$IMAGE_BUILDWITH_REGISTRY" ]]; then
-                  echo "Error: Invalid image mapping. IMAGE_BUILDWITH_TAG, IMAGE_BUILDWITH_TYPE, IMAGE_BUILDWITH_NAME or IMAGE_BUILDWITH_REGISTRY is empty or null."
+                  echo "##[error] Invalid image mapping. IMAGE_BUILDWITH_TAG, IMAGE_BUILDWITH_TYPE, IMAGE_BUILDWITH_NAME or IMAGE_BUILDWITH_REGISTRY is empty or null."
                   exit 1
               fi
 
@@ -486,8 +521,8 @@ jobs:
                   # Replaces all underscores (_) in a string with hyphens (-)
                   IMAGE_BUILDWITH_NAME_ONLY_HYPHENS="${IMAGE_BUILDWITH_NAME//_/-}"
 
-                  # Add IMAGE_BUILDWITH_NAME_ONLY_HYPHENS to validCustomizationsList
-                  validCustomizationsList="$(echo "${validCustomizationsList}" | jq --arg element "${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
+                  # Add IMAGE_BUILDWITH_NAME_ONLY_HYPHENS to VALID_CUSTOMIZATIONS_LIST
+                  VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
 
                   repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
                       repositoryTag="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
@@ -495,7 +530,7 @@ jobs:
                       ${PATCH_FILE_FULL_PATH}
 
                   # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
-                  if [[ "$USE_PREDEFINED_PULL_POLICY" == "True" ]]; then
+                  if [[ "${USE_PREDEFINED_PULL_POLICY}" == "True" ]]; then
                     repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
                       pullPolicy="${PREDEFINED_PULL_POLICY}" \
                       yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' \
@@ -506,17 +541,17 @@ jobs:
           done
 
           # Remove invalid customizations
-          allCustomizations="$(yq '.spec.values.icm-as.customizations | keys' ${PATCH_FILE_FULL_PATH} -o j | jq -rc)"
+          ALL_CUSTOMIZATIONS="$(yq '.spec.values.icm-as.customizations | keys' ${PATCH_FILE_FULL_PATH} -o j | jq -rc)"
 
-          echo "allCustomizations = ${allCustomizations}"
-          echo "validCustomizationsList = ${validCustomizationsList}"
+          echo "ALL_CUSTOMIZATIONS = ${ALL_CUSTOMIZATIONS}"
+          echo "VALID_CUSTOMIZATIONS_LIST = ${VALID_CUSTOMIZATIONS_LIST}"
 
-          for customization in $(echo "${allCustomizations}" | jq -r '.[]'); do
-              if [[ -z $(echo "${validCustomizationsList}" | jq --arg el "${customization}" '. | index($el) // empty') ]]; then
+          for customization in $(echo "${ALL_CUSTOMIZATIONS}" | jq -r '.[]'); do
+              if [[ -z $(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg el "${customization}" '. | index($el) // empty') ]]; then
                   
                   echo "Remove the customization: ${customization}"
-                  invalidCustomization="${customization}" \
-                  yq -i 'del(.spec.values.icm-as.customizations.[env(invalidCustomization)])' ${PATCH_FILE_FULL_PATH}
+                  INVALID_CUSTOMIZATIONS="${customization}" \
+                  yq -i 'del(.spec.values.icm-as.customizations.[env(INVALID_CUSTOMIZATIONS)])' ${PATCH_FILE_FULL_PATH}
               fi
           done
           
@@ -539,15 +574,26 @@ jobs:
           EOF
 
           # Calc the new buildNumber
-          buildNumberPart="${BUILD_BUILD_NUMBER%%_*}"
-          echo "##vso[build.updatebuildnumber]${buildNumberPart}_CD-${{ parameters.product }}-${IMAGE_NAME}_${IMAGE_TAG}"
+          BUILD_NUMBER_PART="${BUILD_BUILD_NUMBER%%_*}"
+          echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${IMAGE_NAME}_${IMAGE_TAG}"
           echo "##vso[build.addbuildtag]${{ parameters.product }}"
+
+          # Checking whether the Regex tag pattern is fulfilled.
+          if [[ $IMAGE_TAG =~ $IMAGE_TAG_PATTERN ]]; then
+            echo "$IMAGE_TAG fulfills the pattern requirement: $IMAGE_TAG_PATTERN"
+            echo "##vso[task.setvariable variable=VALID_TAG]true"
+          else
+            echo "##vso[task.logissue type=warning;]$IMAGE_TAG does not fulfill the pattern requirement: $IMAGE_TAG_PATTERN"
+            echo "##vso[task.setvariable variable=VALID_TAG]false"
+            exit 0
+          fi
   
     - task: Bash@3
       timeoutInMinutes: 1
       displayName: "Set branch name"
+      condition: and(eq(variables.VALID_TAG, 'true'),not(or(failed(), canceled())))
       env:
-        ENV_PATH: "${{ parameters.versionFilePath }}"
+        ENVIRONMENT: "${{ parameters.env }}"
       inputs:
         targetType: 'inline'
         script: |
@@ -556,38 +602,36 @@ jobs:
   
           # Get the revision from the $(Build.BuildNumber)
           BUILD_BUILDNUMBER="$(Build.BuildNumber)"
-          revision="${BUILD_BUILDNUMBER##*.}"
+          REVISION="${BUILD_BUILDNUMBER##*.}"
   
-          if [ -z "${revision}" ]; then
-            echo "##[error] Variable revision must not be empty!"
+          if [ -z "${REVISION}" ]; then
+            echo "##[error] Variable REVISION must not be empty!"
             exit 1
           fi
   
           # Short sourceCommit
-          sourceCommit="$(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)"
-          shortSourceCommit="${sourceCommit:0:10}"
+          SOURCE_COMMIT="$(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)"
+          SOURCE_COMMIT_SHORT="${SOURCE_COMMIT:0:10}"
   
-          if [ -z "${shortSourceCommit}" ]; then
-            echo "##[error] Variable shortSourceCommit must not be empty!"
+          if [ -z "${SOURCE_COMMIT_SHORT}" ]; then
+            echo "##[error] Variable SOURCE_COMMIT_SHORT must not be empty!"
             exit 1
           fi
   
-          # environment
-          environment="${ENV_PATH%%/*}"
-  
-          branchName="${{ parameters.product }}-${environment}/${shortSourceCommit}-$(Build.BuildId)-${revision}"
-          echo "branchName: ${branchName}"
+          BRANCH_NAME="${{ parameters.product }}-${ENVIRONMENT}/${SOURCE_COMMIT_SHORT}-$(Build.BuildId)-${REVISION}"
+          echo "BRANCH_NAME: ${BRANCH_NAME}"
   
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
           # Branch
-              branch:                    ${branchName}
+              branch:                    ${BRANCH_NAME}
   
           EOF
-          echo "##vso[task.setvariable variable=BRANCH_NAME]${branchName}"
+          echo "##vso[task.setvariable variable=BRANCH_NAME]${BRANCH_NAME}"
     - task: Bash@3
       timeoutInMinutes: 1
       displayName: "Current git variables"
+      condition: and(eq(variables.VALID_TAG, 'true'),succeeded())
       inputs:
         targetType: 'inline'
         workingDirectory: $(ENVIRONMENTS_DIRECTORY)
@@ -596,32 +640,33 @@ jobs:
           set -e
   
           # Get the repository name
-          targetRepositoryFull=$(git config --get remote.origin.url)
-          targetRepository="${targetRepositoryFull##*/}"
-          if [ -z "${targetRepository}" ]; then
-            echo "##[error] Variable targetRepository must not be empty!"
+          TARGET_REPOSITORY_FULL=$(git config --get remote.origin.url)
+          TARGET_REPOSITORY="${TARGET_REPOSITORY_FULL##*/}"
+          if [ -z "${TARGET_REPOSITORY}" ]; then
+            echo "##[error] Variable TARGET_REPOSITORY must not be empty!"
             exit 1
           fi
   
           # Get the branch name
-          targetBranchName="${{ parameters.environmentBranch }}"
-          if [ -z "${targetBranchName}" ]; then
-            echo "##[error] Variable targetBranchName must not be empty!"
+          TARGET_BRANCH_NAME="${{ parameters.environmentBranch }}"
+          if [ -z "${TARGET_BRANCH_NAME}" ]; then
+            echo "##[error] Variable TARGET_BRANCH_NAME must not be empty!"
             exit 1
           fi
   
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
           # Repository
-              TARGET_REPOSITORY:                    ${targetRepository}
-              TARGET_BRANCH_NAME:                   ${targetBranchName}
+              TARGET_REPOSITORY:                    ${TARGET_REPOSITORY}
+              TARGET_BRANCH_NAME:                   ${TARGET_BRANCH_NAME}
   
           EOF
-          echo "##vso[task.setvariable variable=TARGET_REPOSITORY]${targetRepository}"
-          echo "##vso[task.setvariable variable=TARGET_BRANCH_NAME]${targetBranchName}"
+          echo "##vso[task.setvariable variable=TARGET_REPOSITORY]${TARGET_REPOSITORY}"
+          echo "##vso[task.setvariable variable=TARGET_BRANCH_NAME]${TARGET_BRANCH_NAME}"
     - task: Bash@3
       timeoutInMinutes: 1
       displayName: "Configure Git"
+      condition: and(eq(variables.VALID_TAG, 'true'),succeeded())
       env:
         PR_USER_NAME: "ISH-CD"
         PR_USER_EMAIL: "intershop@intershop.com"
@@ -640,6 +685,7 @@ jobs:
     - task: Bash@3
       timeoutInMinutes: 5
       displayName: "Create new branch"
+      condition: and(eq(variables.VALID_TAG, 'true'),succeeded())
       env:
         BRANCH_NAME: $(BRANCH_NAME)
       inputs:
@@ -655,21 +701,21 @@ jobs:
           # Stage all files
           git add -A
           # Git status
-          gitStatus=$(git status --porcelain | head -1)
-          echo "gitStatus: ${gitStatus}"
+          GIT_STATUS=$(git status --porcelain | head -1)
+          echo "GIT_STATUS: ${GIT_STATUS}"
 
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
           # Git
-              gitStatus:                            ${gitStatus}
+              GIT_STATUS:                            ${GIT_STATUS}
           EOF
   
-          echo "##vso[task.setvariable variable=GIT_STATUS]${gitStatus}"   
+          echo "##vso[task.setvariable variable=GIT_STATUS]${GIT_STATUS}"   
     
     - task: Bash@3
       timeoutInMinutes: 5
       name: "Create_PR"
-      condition: and(succeeded(), eq('${{ parameters.prCreatePullRequest }}', 'true'), ne(variables['GIT_STATUS'], ''))
+      condition: and(succeeded(), eq('${{ parameters.prCreatePullRequest }}', 'true'), ne(variables['GIT_STATUS'], ''), eq(variables.VALID_TAG, 'true'))
       displayName: "Create Pull Request"
       env:
         BRANCH_NAME: $(BRANCH_NAME)
@@ -698,28 +744,28 @@ jobs:
           git push --set-upstream origin ${BRANCH_NAME}
 
           
-          pr_parameters=""
+          PR_PARAMETERS=""
           # Set reviewers parameter
           if [ ! -z "${PR_REVIEWERS}" ]; then
-            pr_parameters="${pr_parameters} --reviewers \"${PR_REVIEWERS}\""
+            PR_PARAMETERS="${PR_PARAMETERS} --reviewers \"${PR_REVIEWERS}\""
           fi
 
           # Set the delete-source-branch parameter
           if [ "${PR_DELETE_SOURCE_BRANCH}" = "True" ] ; then
-            pr_parameters="${pr_parameters} --delete-source-branch true"
+            PR_PARAMETERS="${PR_PARAMETERS} --delete-source-branch true"
           fi
 
           # Set the squash parameter
           if [ "${PR_SQUASH}" = "True" ] ; then
-            pr_parameters="${pr_parameters} --squash true"
+            PR_PARAMETERS="${PR_PARAMETERS} --squash true"
           fi
 
           # Set the auto-complete parameter
           if [ "${PR_AUTOCOMPLETE}" = "True" ] ; then
-            pr_parameters="${pr_parameters} --auto-complete true"
+            PR_PARAMETERS="${PR_PARAMETERS} --auto-complete true"
           fi
 
-          echo "parameter: ${pr_parameters}"
+          echo "parameter: ${PR_PARAMETERS}"
           
           prResponse=$(az repos pr create \
             --project $(System.TeamProject) \
@@ -727,28 +773,28 @@ jobs:
             --target-branch ${TARGET_BRANCH_NAME} \
             --source-branch ${BRANCH_NAME} \
             --title "deployment $(Build.BuildNumber) - ${BRANCH_NAME}" \
-            ${pr_parameters} \
+            ${PR_PARAMETERS} \
             -o json)
           
     
           echo $prResponse
-          prNum=$(echo $prResponse | jq '.pullRequestId')
-          if [ -z "${prNum}" ]; then
-            echo "##[error] Variable prNum must not be empty!"
+          PR_NUM=$(echo $prResponse | jq '.pullRequestId')
+          if [ -z "${PR_NUM}" ]; then
+            echo "##[error] Variable PR_NUM must not be empty!"
             exit 1
           fi
   
-          echo "prNum="$prNum
+          echo "PR_NUM="$PR_NUM
 
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
           # PullRequest
-              prNum:                                ${prNum}
-              pr_parameters:                        ${pr_parameters}
+              PR_NUM:                               ${PR_NUM}
+              PR_PARAMETERS:                        ${PR_PARAMETERS}
   
           EOF
-          echo "##vso[task.setvariable variable=PR_NUM]$prNum"
-          echo "##vso[task.setvariable variable=PR_NUM;isOutput=true]$prNum"
+          echo "##vso[task.setvariable variable=PR_NUM]$PR_NUM"
+          echo "##vso[task.setvariable variable=PR_NUM;isOutput=true]$PR_NUM"
           
     - task: Bash@3
       timeoutInMinutes: 1
