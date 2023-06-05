@@ -317,6 +317,7 @@ jobs:
         PREDEFINED_REGISTRY_SSR: ${{ parameters.pwaPredefinedSsrRegistry }}
         PREDEFINED_REGISTRY_NGNIX: ${{ parameters.pwaPredefinedNginxRegistry }}
         IMAGE_TAG_PATTERN: ${{ parameters.imageTagPattern }}
+        ENVIRONMENT: ${{ parameters.env }}
       inputs:
         targetType: 'inline'
         script: |
@@ -410,6 +411,7 @@ jobs:
           if [[ $IMAGE_TAG =~ $IMAGE_TAG_PATTERN ]]; then
             echo "$IMAGE_TAG fulfills the pattern requirement: $IMAGE_TAG_PATTERN"
             echo "##vso[task.setvariable variable=VALID_TAG]true"
+            echo "##vso[build.addbuildtag]${ENVIRONMENT}"
           else
             echo "##vso[task.logissue type=warning;]$IMAGE_TAG does not fulfill the pattern requirement: $IMAGE_TAG_PATTERN"
             echo "##vso[task.setvariable variable=VALID_TAG]false"
@@ -427,6 +429,7 @@ jobs:
         USE_PREDEFINED_PULL_POLICY: ${{ parameters.usePredefinedPullPolicy }}
         PREDEFINED_PULL_POLICY: ${{ parameters.predefinedPullPolicy }}
         IMAGE_TAG_PATTERN: ${{ parameters.imageTagPattern }}
+        ENVIRONMENT: ${{ parameters.env }}
       inputs:
         targetType: 'inline'
         script: |
@@ -582,6 +585,7 @@ jobs:
           if [[ $IMAGE_TAG =~ $IMAGE_TAG_PATTERN ]]; then
             echo "$IMAGE_TAG fulfills the pattern requirement: $IMAGE_TAG_PATTERN"
             echo "##vso[task.setvariable variable=VALID_TAG]true"
+            echo "##vso[build.addbuildtag]${ENVIRONMENT}"
           else
             echo "##vso[task.logissue type=warning;]$IMAGE_TAG does not fulfill the pattern requirement: $IMAGE_TAG_PATTERN"
             echo "##vso[task.setvariable variable=VALID_TAG]false"
