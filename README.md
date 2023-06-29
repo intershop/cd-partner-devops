@@ -75,7 +75,7 @@ The respective CI pipelines of the different products of the Intershop Commerce 
         name: issup/issup/master/pwa-nginx
         registry: <NAME>.azurecr.io
     ```
-
+    
 - IOM:
     ```
     images:
