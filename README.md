@@ -41,7 +41,7 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | usePredefinedRegistry | Decide whether to use a predefined registry or the registry value from the imagePropertiesFile. | false | Yes | pwa |  |
 | usePredefinedPullPolicy | Decide whether to use a predefined pullPolicy.  | false | No | icm |  |
 | predefinedPullPolicy | Predefined PullPolicy. | IfNotPresent | No | icm |  |
-| imageTagPattern | Regular expression pattern that the ImageTag must satisfy. This pattern ensures that the ImageTag is a valid Docker image tag and can be used to process only Docker Tags with this particular pattern. | ^[^\s][[:graph:]]*$ | Yes |  |  |
+| imageTagPattern | Regular expression pattern that the ImageTag must satisfy. This pattern ensures that the ImageTag is a valid Docker image tag and can be used to process only Docker Tags with this particular pattern. (POSIX-Extended Regular Expressions) | ^[^\s][[:graph:]]*$ | Yes |  |  |
 | pwaPredefinedSsrRegistry | PWA specific parameter. Predefined registry for SSR. |  | No | pwa |  |
 | pwaPredefinedNginxRegistry | PWA specific parameter. Predefined registry for Nginx. |  | No | pwa |  |
 
