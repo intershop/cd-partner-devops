@@ -38,10 +38,10 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | prReviewers | Additional users or groups to include as reviewers on the new pull request. Space separated. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create |  | No |  |  |
 | prSquash | Squash the commits in the source branch when merging into the target branch. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
 | prAutoComplete | Set the pull request to complete automatically when all policies have passed and the source branch can be merged into the target branch. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
-| usePredefinedRegistry | Decide whether to use a predefined registry or the registry value from the imagePropertiesFile. | false | Yes |  |  |
-| usePredefinedPullPolicy | Decide whether to use a predefined pullPolicy.  | false | No |  |  |
-| predefinedPullPolicy | Predefined PullPolicy. | IfNotPresent | No |  |  |
-| imageTagPattern | Regular expression pattern that the ImageTag must satisfy. This pattern ensures that the ImageTag is a valid Docker image tag and can be used to process only Docker Tags with this particular pattern. | ^[^\s][[:graph:]]*$ | Yes |  |  |
+| usePredefinedRegistry | Decide whether to use a predefined registry or the registry value from the imagePropertiesFile. | false | Yes | pwa |  |
+| usePredefinedPullPolicy | Decide whether to use a predefined pullPolicy.  | false | No | icm |  |
+| predefinedPullPolicy | Predefined PullPolicy. | IfNotPresent | No | icm |  |
+| imageTagPattern | Regular expression pattern that the ImageTag must satisfy. This pattern ensures that the ImageTag is a valid Docker image tag and can be used to process only Docker Tags with this particular pattern. (POSIX-Extended Regular Expressions) | ^[^\s][[:graph:]]*$ | Yes |  |  |
 | pwaPredefinedSsrRegistry | PWA specific parameter. Predefined registry for SSR. |  | No | pwa |  |
 | pwaPredefinedNginxRegistry | PWA specific parameter. Predefined registry for Nginx. |  | No | pwa |  |
 
@@ -73,6 +73,15 @@ The respective CI pipelines of the different products of the Intershop Commerce 
     - type: nginx
         tag: <IMAGE_TAG>
         name: issup/issup/master/pwa-nginx
+        registry: <NAME>.azurecr.io
+    ```
+
+- IOM:
+    ```
+    images:
+    - type: iom
+        tag: <IMAGE_TAG>
+        name: <IMAGE_NAME>
         registry: <NAME>.azurecr.io
     ```
 
