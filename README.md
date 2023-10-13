@@ -10,6 +10,7 @@ This pipeline template can only be used in conjunction with the following preced
 
 - ICM: https://github.com/intershop/icm-partner-devops
 - PWA: https://github.com/intershop/pwa-partner-devops
+- IOM: https://github.com/intershop/iom-partner-devops
 
 ## How to use the pipeline template
 
