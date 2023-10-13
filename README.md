@@ -32,7 +32,7 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | triggerPipelineName | Name of the CI pipeline. The branch name is given in "resources.pipelines". |  | Yes |  |  |
 | pipelineArtifactName | Name of the CI pipeline artifact. | image | Yes |  |  |
 | imagePropertiesFile | Name of the file to be analyzed. | imageProperties.yaml | Yes |  |  |
-| versionFilePath | Path of version file to be overwritten in the environment repository. For example: int/icm/version.yaml |  | Yes |  |  |
+| versionFilePath | Path of version file to be overwritten in the environment repository. For example: int/icm/version.yaml. A comma-separated list of different files can also be provided. All files will be modified with a pull request. |  | Yes |  |  |
 | prCreatePullRequest | Specifies whether a PR should be created. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
 | prDeleteSourceBranch | Delete the source branch after the pull request has been completed and merged into the target branch. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
 | prReviewers | Additional users or groups to include as reviewers on the new pull request. Space separated. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create |  | No |  |  |
