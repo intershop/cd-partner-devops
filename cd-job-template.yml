@@ -168,10 +168,6 @@ jobs:
       value: $(Pipeline.Workspace)/config_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
     - name: MD_PATCH_FILE
       value: $(Pipeline.Workspace)/cd-patched-file_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}.md
-    - name: YQ_VERSION
-      value: v4.33.3
-    - name: YQ_BINARY
-      value: yq_linux_amd64
   
   steps:
     - download: ${{ parameters.triggerPipelineName }}
