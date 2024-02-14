@@ -139,9 +139,15 @@ parameters:
 # ICM specific parameter
 #
 
+# Predefined name of the project customizations
+- name: icmPredefinedProjectCustomizationName
+  type: string
+  default: 'icm-as-customization-project-icm'
+
 #
 # PWA specific parameter
 #
+
 - name: pwaPredefinedSsrRegistry
   type: string
   default: ''
@@ -190,39 +196,40 @@ jobs:
           cat > "$(MD_CONFIG_FILE)" <<EOF
   
           # Parameters
-              id:                         ${{ parameters.id }}
-              project:                    ${{ parameters.product }}
-              triggerPipelineName:        ${{ parameters.triggerPipelineName }}
-              pipelineArtifactName:       ${{ parameters.pipelineArtifactName }}
-              imagePropertiesFile:        ${{ parameters.imagePropertiesFile }}
-              environmentPath:            ${{ parameters.environmentPath }}
-              env:                        ${{ parameters.env }}
-              environmentBranch:          ${{ parameters.environmentBranch }}
-              versionFilePath:            ${{ parameters.versionFilePath }}
-              IMAGE_ARTIFACT_FILE_PATH:   $(IMAGE_ARTIFACT_FILE_PATH)
-              prCreatePullRequest:        ${{ parameters.prCreatePullRequest }}
-              prDeleteSourceBranch:       ${{ parameters.prDeleteSourceBranch }}
-              prReviewers:                ${{ parameters.prReviewers }}
-              prAutoComplete:             ${{ parameters.prAutoComplete }}
-              prSquash:                   ${{ parameters.prSquash }}
-              usePredefinedRegistry:      ${{ parameters.usePredefinedRegistry }}
-              usePredefinedPullPolicy:    ${{ parameters.usePredefinedPullPolicy }}
-              predefinedPullPolicy:       ${{ parameters.predefinedPullPolicy }}
-              imageTagPattern:            ${{ parameters.imageTagPattern }}
+            id:                                   ${{ parameters.id }}
+            project:                              ${{ parameters.product }}
+            triggerPipelineName:                  ${{ parameters.triggerPipelineName }}
+            pipelineArtifactName:                 ${{ parameters.pipelineArtifactName }}
+            imagePropertiesFile:                  ${{ parameters.imagePropertiesFile }}
+            environmentPath:                      ${{ parameters.environmentPath }}
+            env:                                  ${{ parameters.env }}
+            environmentBranch:                    ${{ parameters.environmentBranch }}
+            versionFilePath:                      ${{ parameters.versionFilePath }}
+            IMAGE_ARTIFACT_FILE_PATH:             $(IMAGE_ARTIFACT_FILE_PATH)
+            prCreatePullRequest:                  ${{ parameters.prCreatePullRequest }}
+            prDeleteSourceBranch:                 ${{ parameters.prDeleteSourceBranch }}
+            prReviewers:                          ${{ parameters.prReviewers }}
+            prAutoComplete:                       ${{ parameters.prAutoComplete }}
+            prSquash:                             ${{ parameters.prSquash }}
+            usePredefinedRegistry:                ${{ parameters.usePredefinedRegistry }}
+            usePredefinedPullPolicy:              ${{ parameters.usePredefinedPullPolicy }}
+            predefinedPullPolicy:                 ${{ parameters.predefinedPullPolicy }}
+            imageTagPattern:                      ${{ parameters.imageTagPattern }}
 
           # Pipeline
-              pipelineID:                 $(resources.pipeline.${{ parameters.triggerPipelineName }}.pipelineID)
-              runName:                    $(resources.pipeline.${{ parameters.triggerPipelineName }}.runName)
-              runID:                      $(resources.pipeline.${{ parameters.triggerPipelineName }}.runID)
-              runURI:                     $(resources.pipeline.${{ parameters.triggerPipelineName }}.runURI)
-              sourceBranch:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceBranch)
-              sourceCommit:               $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)
-          
+            pipelineID:                           $(resources.pipeline.${{ parameters.triggerPipelineName }}.pipelineID)
+            runName:                              $(resources.pipeline.${{ parameters.triggerPipelineName }}.runName)
+            runID:                                $(resources.pipeline.${{ parameters.triggerPipelineName }}.runID)
+            runURI:                               $(resources.pipeline.${{ parameters.triggerPipelineName }}.runURI)
+            sourceBranch:                         $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceBranch)
+            sourceCommit:                         $(resources.pipeline.${{ parameters.triggerPipelineName }}.sourceCommit)
+        
           # ICM
+            icmPredefinedProjectCustomizationName:${{ parameters.icmPredefinedProjectCustomizationName }}
 
           # PWA
-            ssrRegistry:                  ${{ parameters.pwaPredefinedSsrRegistry }}
-            nginxRegistry:                ${{ parameters.pwaPredefinedNginxRegistry }}
+            ssrRegistry:                          ${{ parameters.pwaPredefinedSsrRegistry }}
+            nginxRegistry:                        ${{ parameters.pwaPredefinedNginxRegistry }}
 
   
           EOF
@@ -252,11 +259,11 @@ jobs:
           fi
 
           # Check if the 'IMAGE_ARTIFACT_FILE_PATH' file exists
-          if [ ! -f $(IMAGE_ARTIFACT_FILE_PATH) ]; then
+          if [ ! -f "$(IMAGE_ARTIFACT_FILE_PATH)" ]; then
               echo "##[error] The file IMAGE_ARTIFACT_FILE_PATH does not exist."
               exit 1
           fi
-          if [ ! -s $(IMAGE_ARTIFACT_FILE_PATH) ]; then
+          if [ ! -s "$(IMAGE_ARTIFACT_FILE_PATH)" ]; then
               echo "##[error] The file IMAGE_ARTIFACT_FILE_PATH exists but is empty."
               exit 1
           fi
@@ -300,7 +307,7 @@ jobs:
             EOF
 
             # Check if the 'PATCH_FILE_FULL_PATH' file exists
-            if [ ! -f ${PATCH_FILE_FULL_PATH} ]; then
+            if [ ! -f "${PATCH_FILE_FULL_PATH}" ]; then
                 echo "##[error] The PATCH_FILE_FULL_PATH: ${PATCH_FILE_FULL_PATH} file does not exist."
                 exit 1
             fi
@@ -339,9 +346,6 @@ jobs:
                 IMAGE_TYPE=$(echo "$image" | yq e '.type')
                 IMAGE_NAME=$(echo "$image" | yq e '.name')
                 IMAGE_REGISTRY=$(echo "$image" | yq e '.registry')
-
-                # Set BUILD_VALUE_VERSION
-                BUILD_VALUE_VERSION=$IMAGE_TAG
                 
                 echo "Image: ${IMAGE_TYPE} | ${IMAGE_NAME} | ${IMAGE_TAG} | ${IMAGE_REGISTRY} "
 
@@ -403,7 +407,7 @@ jobs:
 
             # Calc the new buildNumber
             BUILD_NUMBER_PART="${BUILD_BUILD_NUMBER%%_*}"
-            echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${BUILD_VALUE_VERSION}"
+            echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${IMAGE_TAG}"
             echo "##vso[build.addbuildtag]${{ parameters.product }}"
 
             # Checking whether the Regex tag pattern is fulfilled.
@@ -428,6 +432,7 @@ jobs:
           PREDEFINED_PULL_POLICY: ${{ parameters.predefinedPullPolicy }}
           IMAGE_TAG_PATTERN: ${{ parameters.imageTagPattern }}
           ENVIRONMENT: ${{ parameters.env }}
+          PROJECT_CUSTOMIZATION_NAME: ${{ parameters.icmPredefinedProjectCustomizationName }}
         inputs:
           targetType: 'inline'
           script: |
@@ -438,9 +443,6 @@ jobs:
             # The script reads and analyzes the file located at $IMAGE_ARTIFACT_FILE_PATH.
             # It then checks the tag against the regex pattern defined in $IMAGE_TAG_PATTERN 
             # and applies the necessary changes to the file located at $PATCH_FILE_FULL_PATH.
-
-            # Create a temporary file
-            tmpfile=$(mktemp)
 
             # Create valid customizations list
             VALID_CUSTOMIZATIONS_LIST="[]"
@@ -457,22 +459,19 @@ jobs:
                 exit 1
             fi
 
-            # Replaces all underscores (_) in a string with hyphens (-)
-            IMAGE_NAME_ONLY_HYPHENS="${IMAGE_NAME//_/-}"
-
-            # Add IMAGE_NAME_ONLY_HYPHENS to VALID_CUSTOMIZATIONS_LIST
-            VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${IMAGE_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
+            # Add PROJECT_CUSTOMIZATION_NAME to VALID_CUSTOMIZATIONS_LIST
+            VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${PROJECT_CUSTOMIZATION_NAME}"  -rc '. + [$element]')"
 
             # Add the ${IMAGE_NAME} version to .spec.values.icm-as.customizations.<customization>.repository
-            repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
-            repositoryTag="\${project_container_registry}/${IMAGE_NAME}:${IMAGE_TAG}" \
-            yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' ${PATCH_FILE_FULL_PATH}
+            REPOSITORY_NAME="${PROJECT_CUSTOMIZATION_NAME}" \
+            REPOSITORY_TAG="\${project_container_registry}/${IMAGE_NAME}:${IMAGE_TAG}" \
+            yq -i '.spec.values.icm-as.customizations.[env(REPOSITORY_NAME)].repository  = strenv(REPOSITORY_TAG)' ${PATCH_FILE_FULL_PATH}
 
             # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
             if [[ "${USE_PREDEFINED_PULL_POLICY}" == "True" ]]; then
-              repositoryName="${IMAGE_NAME_ONLY_HYPHENS}" \
+              REPOSITORY_NAME="${PROJECT_CUSTOMIZATION_NAME}" \
                 pullPolicy="${PREDEFINED_PULL_POLICY}" \
-                yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' ${PATCH_FILE_FULL_PATH}
+                yq -i '.spec.values.icm-as.customizations.[env(REPOSITORY_NAME)].pullPolicy = strenv(pullPolicy)' ${PATCH_FILE_FULL_PATH}
             fi
 
             # Check if the "build.with" key exists in the IMAGE_ARTIFACT_FILE_PATH file
@@ -503,8 +502,8 @@ jobs:
 
                 # Add the icm-as version to spec.values.icm-as.image.tag
                 if [ "${IMAGE_BUILDWITH_NAME}" == "icm-as" ]; then
-                version="${IMAGE_BUILDWITH_TAG}" \
-                    yq -i '.spec.values.icm-as.image.tag  = strenv(version)' ${PATCH_FILE_FULL_PATH}
+                VERSION="${IMAGE_BUILDWITH_TAG}" \
+                    yq -i '.spec.values.icm-as.image.tag  = strenv(VERSION)' ${PATCH_FILE_FULL_PATH}
 
                 # Add the icm-webadapteragent version to spec.values.icm-web.agent.image.repository  
                 elif [ "${IMAGE_BUILDWITH_NAME}" == "icm-webadapteragent" ]; then
@@ -518,26 +517,24 @@ jobs:
 
                 # Add all other customizations versions to .spec.values.icm-as.customizations.<customization>.repository
                 else
+                  # Replaces all underscores (_) in a string with hyphens (-)
+                  IMAGE_BUILDWITH_NAME_ONLY_HYPHENS="${IMAGE_BUILDWITH_NAME//_/-}"
 
-                    # Replaces all underscores (_) in a string with hyphens (-)
-                    IMAGE_BUILDWITH_NAME_ONLY_HYPHENS="${IMAGE_BUILDWITH_NAME//_/-}"
+                  # Add IMAGE_BUILDWITH_NAME_ONLY_HYPHENS to VALID_CUSTOMIZATIONS_LIST
+                  VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
 
-                    # Add IMAGE_BUILDWITH_NAME_ONLY_HYPHENS to VALID_CUSTOMIZATIONS_LIST
-                    VALID_CUSTOMIZATIONS_LIST="$(echo "${VALID_CUSTOMIZATIONS_LIST}" | jq --arg element "${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}"  -rc '. + [$element]')"
+                  REPOSITORY_NAME="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
+                      REPOSITORY_TAG="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
+                      yq -i '.spec.values.icm-as.customizations.[env(REPOSITORY_NAME)].repository  = strenv(REPOSITORY_TAG)' \
+                      ${PATCH_FILE_FULL_PATH}
 
-                    repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
-                        repositoryTag="\${icm_container_registry}/${IMAGE_BUILDWITH_NAME}:${IMAGE_BUILDWITH_TAG}" \
-                        yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].repository  = strenv(repositoryTag)' \
-                        ${PATCH_FILE_FULL_PATH}
-
-                    # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
-                    if [[ "${USE_PREDEFINED_PULL_POLICY}" == "True" ]]; then
-                      repositoryName="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
-                        pullPolicy="${PREDEFINED_PULL_POLICY}" \
-                        yq -i '.spec.values.icm-as.customizations.[env(repositoryName)].pullPolicy = strenv(pullPolicy)' \
-                        ${PATCH_FILE_FULL_PATH}
-                    fi
-                    
+                  # If USE_PREDEFINED_PULL_POLICY is true, than use PREDEFINED_PULL_POLICY as pullPolicy
+                  if [[ "${USE_PREDEFINED_PULL_POLICY}" == "True" ]]; then
+                    REPOSITORY_NAME="${IMAGE_BUILDWITH_NAME_ONLY_HYPHENS}" \
+                      pullPolicy="${PREDEFINED_PULL_POLICY}" \
+                      yq -i '.spec.values.icm-as.customizations.[env(REPOSITORY_NAME)].pullPolicy = strenv(pullPolicy)' \
+                      ${PATCH_FILE_FULL_PATH}
+                  fi
                 fi
             done
 
@@ -621,9 +618,6 @@ jobs:
                 IMAGE_TYPE=$(echo "$image" | yq e '.type')
                 IMAGE_NAME=$(echo "$image" | yq e '.name')
                 IMAGE_REGISTRY=$(echo "$image" | yq e '.registry')
-
-                # Set BUILD_VALUE_VERSION
-                BUILD_VALUE_VERSION=$IMAGE_TAG
                 
                 echo "Image: ${IMAGE_TYPE} | ${IMAGE_NAME} | ${IMAGE_TAG} | ${IMAGE_REGISTRY} "
 
@@ -662,7 +656,7 @@ jobs:
 
             # Calc the new buildNumber
             BUILD_NUMBER_PART="${BUILD_BUILD_NUMBER%%_*}"
-            echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${BUILD_VALUE_VERSION}"
+            echo "##vso[build.updatebuildnumber]${BUILD_NUMBER_PART}_CD-${{ parameters.product }}-${IMAGE_TAG}"
             echo "##vso[build.addbuildtag]${{ parameters.product }}"
 
             # Checking whether the Regex tag pattern is fulfilled.
@@ -768,9 +762,9 @@ jobs:
           set -e
   
           git config \
-            --global user.email ${PR_USER_EMAIL}
+            --global user.email "${PR_USER_EMAIL}"
           git config \
-            --global user.name ${PR_USER_NAME}
+            --global user.name "${PR_USER_NAME}"
   
     - task: Bash@3
       timeoutInMinutes: 5
@@ -815,6 +809,7 @@ jobs:
         PR_REVIEWERS: ${{ parameters.prReviewers }}
         PR_SQUASH: ${{ parameters.prSquash }}
         PR_AUTOCOMPLETE: ${{ parameters.prAutoComplete }}
+        AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
       inputs:
         targetType: 'inline'
         workingDirectory: $(ENVIRONMENTS_DIRECTORY)
@@ -822,17 +817,16 @@ jobs:
           #!/bin/bash
           set -e
   
-          # az devops config
-          az config set extension.use_dynamic_install=yes_without_prompt
-          echo $(System.AccessToken) | az devops login
-          az devops configure \
-            --defaults organization=$(System.CollectionUri) project=$(System.TeamProject) \
-            --use-git-aliases true
-  
-          # Commit the changes
+          # az install extension
+          az extension add \
+            --name azure-devops \
+            --allow-preview false \
+            --only-show-errors
+
+          # Commit and push the changes
+          echo "Commit the changes and push the branch:"
           git commit -m "deployment $(Build.BuildNumber) - ${BRANCH_NAME}"
           git push --set-upstream origin ${BRANCH_NAME}
-
           
           PR_PARAMETERS=""
           # Set reviewers parameter
@@ -855,26 +849,26 @@ jobs:
             PR_PARAMETERS="${PR_PARAMETERS} --auto-complete true"
           fi
 
-          echo "parameter: ${PR_PARAMETERS}"
+          echo "Additional parameterlist for 'az repos pr create': ${PR_PARAMETERS}"
           
-          prResponse=$(az repos pr create \
-            --project $(System.TeamProject) \
-            --repository ${TARGET_REPOSITORY} \
-            --target-branch ${TARGET_BRANCH_NAME} \
-            --source-branch ${BRANCH_NAME} \
+          PR_RESPONSE=$(az repos pr create \
+            --project "$(System.TeamProject)" \
+            --org "$(System.CollectionUri)" \
+            --repository "${TARGET_REPOSITORY}" \
+            --target-branch "${TARGET_BRANCH_NAME}" \
+            --source-branch "${BRANCH_NAME}" \
             --title "deployment $(Build.BuildNumber) - ${BRANCH_NAME}" \
             ${PR_PARAMETERS} \
             -o json)
-          
-    
-          echo $prResponse
-          PR_NUM=$(echo $prResponse | jq '.pullRequestId')
+
+          echo "Result of the pull request creation: $PR_RESPONSE"
+          PR_NUM=$(echo $PR_RESPONSE | jq '.pullRequestId')
           if [ -z "${PR_NUM}" ]; then
             echo "##[error] Variable PR_NUM must not be empty!"
             exit 1
           fi
   
-          echo "PR_NUM="$PR_NUM
+          echo "Pull request id: $PR_NUM"
 
           cat >> "$(MD_CONFIG_FILE)" <<EOF
   
