@@ -20,7 +20,9 @@ resources:
         - master
         - develop
         # Trigger by tag pipeline
-        - refs/tags/*
+      tags:
+        include:
+          - *
 
   repositories:
     - repository: <environments-repository>
@@ -41,15 +43,11 @@ variables:
   #  - REPO_PATH:                         host name and path of the customer ACR
   - group: iom-build-configuration
 
-
 #
 # The CD process can be very individual.
 # The template has numerous parameters to configure the behavior separately for each environment.
 #
 
-#
-# In the following example, each change is incorporated into the Int environment without any restrictions.
-#
 stages:
 - stage: CD_int
   jobs:
@@ -58,6 +56,41 @@ stages:
         agentPool: $(BUILD_AGENT_POOL)
         env: int
         product: iom
-        environmentPath: <environments-repository>
-        triggerPipelineName: <iom-ci-pipeline>
-        versionFilePath: <path-to-the-yaml-file-in-int-environments-repository>
+        environmentPath: environments
+        triggerPipelineName: <iom-ci-pipeline-name>
+        versionFilePath: int/iom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+
+- stage: CD_uat
+  dependsOn:
+    - CD_int
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<iom-ci-pipeline-name>.sourceBranch'], 'refs/tags/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: uat
+        product: iom
+        environmentPath: environments
+        triggerPipelineName: <iom-ci-pipeline-name>
+        versionFilePath: uat/iom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+
+- stage: CD_prd
+  dependsOn:
+    - CD_uat
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<iom-ci-pipeline-name>.sourceBranch'], 'refs/tags/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: prd
+        product: iom
+        environmentPath: environments
+        triggerPipelineName: <iom-ci-pipeline-name>
+        versionFilePath: prd/iom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
