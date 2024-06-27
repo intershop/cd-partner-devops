@@ -16,19 +16,19 @@ resources:
     trigger:
       branches:
         include:
-        # Trigger by branch pipeline
-        - master
-        - develop
-        - release/*
-        - feature/*
-        - hotfix/*
-        # Trigger by tag pipeline
-        - refs/tags/release-*
+          # Trigger by branch pipeline
+          - master
+          - develop
+          - release/*
+      # Trigger by tag pipeline
+      tags:
+        include:
+          - version/*
 
   repositories:
-    - repository: <environments-repository>
+    - repository: environments
       type: git
-      name: <environments-repository>
+      name: environments
       ref: master
     - repository: cd-partner-devops
       type: github
@@ -44,81 +44,94 @@ variables:
   #  - REPO_PATH:                         host name and path of the customer ACR
   - group: pwa-build-configuration
 
-
 #
 # The CD process can be very individual.
 # The template has numerous parameters to configure the behavior separately for each environment.
 #
 
-#
-# In the following example, each change is incorporated into the Int environment without any restrictions.
-#
+
 stages:
 - stage: CD_int
   jobs:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: int
+        env: int_edit
         product: pwa
-        environmentPath: <environments-repository>
-        triggerPipelineName: <pwa-ci-pipeline>
-        versionFilePath: <path-to-the-yaml-file-in-int-environments-repository>
-#
-# Subsequently, the CD_uat pipeline stage will be initiated. 
-# It is dependent on the CD_int stage and must first be approved by selected users. 
-# During PR creation, reviewers are assigned and the PR-Auto-complete function is deactivated.
-#
-#- stage: CD_uat
-#  dependsOn:
-#    - CD_int
-#  jobs:
-#    - job: waitForValidation
-#      displayName: Wait for external validation
-#      pool: server
-#      timeoutInMinutes: 43200 # job times out in 30 days
-#      steps:
-#      - task: ManualValidation@0
-#        timeoutInMinutes: 43200 # task times out in 30 day
-#        inputs:
-#          notifyUsers: |
-#            userc@intershop.com
-#          instructions: 'Please validate uat'
-#          onTimeout: 'reject'
-#    - template: cd-job-template.yml@cd-partner-devops
-#      parameters:
-#        agentPool: $(BUILD_AGENT_POOL)
-#        product: pwa
-#        env: uat
-#        environmentPath: <environments-repository>
-#        triggerPipelineName: <pwa-ci-pipeline>
-#        versionFilePath: <path-to-the-yaml-file-in-uat-environments-repository>
-#        prReviewers: userA@intershop.de,userb@intershop.de
-#        prAutoComplete: false
-#
-#- stage: CD_prd
-#  dependsOn:
-#    - CD_uat
-#  jobs:
-#    - job: waitForValidation
-#      displayName: Wait for external validation
-#      pool: server
-#      timeoutInMinutes: 43200 # job times out in 30 days
-#      steps:
-#      - task: ManualValidation@0
-#        timeoutInMinutes: 43200 # task times out in 30 day
-#        inputs:
-#          notifyUsers: |
-#            userc@intershop.com
-#          instructions: 'Please validate PRD'
-#          onTimeout: 'reject'
-#    - template: cd-job-template.yml@cd-partner-devops
-#      parameters:
-#        agentPool: $(BUILD_AGENT_POOL)
-#        product: pwa
-#        env: prd
-#        environmentPath: <environments-repository>
-#        triggerPipelineName: <pwa-ci-pipeline>
-#        versionFilePath: <path-to-the-yaml-file-in-prd-environments-repository>
-#        prReviewers: userA@intershop.de,userb@intershop.de
-#        prAutoComplete: false
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: int/pwa/version-edit.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: int_live
+        product: pwa
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: int/pwa/version-live.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+        dependsOn: "CD_pwa_int_edit"
+
+- stage: CD_uat
+  dependsOn:
+    - CD_int
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<pwa-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: uat_edit
+        product: pwa
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: uat/pwa/version-edit.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: uat_live
+        product: pwa
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: uat/pwa/version-live.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+        dependsOn: "CD_pwa_uat_edit"
+
+- stage: CD_prd
+  dependsOn:
+    - CD_uat
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<pwa-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: prd_edit
+        product: pwa
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: prd/pwa/version-edit.yaml
+        prAutoComplete: true
+        useDeploymentJob: true
+        manualValidationEnabledForPrd: false
+        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+    
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL)
+        env: prd_live
+        product: pwa
+        environmentPath: environments
+        triggerPipelineName: <pwa-ci-pipeline-name>
+        versionFilePath: prd/pwa/version-live.yaml
+        prAutoComplete: true
+        manualValidationEnabledForPrd: false
+        useDeploymentJob: true
+        dependsOn: "CD_pwa_prd_edit"
+        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

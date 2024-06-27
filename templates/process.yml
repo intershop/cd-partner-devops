@@ -1,0 +1,130 @@
+parameters:
+  - name: versionFilePath
+    type: string
+    default:
+  - name: triggerPipelineName
+    type: string
+    default:
+  - name: environmentPath
+    type: string
+    default:
+  - name: templateRepository
+    type: string
+    default:
+
+steps:
+  - download: ${{ parameters.triggerPipelineName }}
+  - checkout: self
+    clean: true
+  - checkout: ${{ parameters.environmentPath }}
+    clean: true
+    persistCredentials: true
+    fetchDepth: 0
+  - checkout: ${{ parameters.templateRepository }}
+    clean: true
+    persistCredentials: false
+    fetchDepth: 1
+
+  - task: Bash@3
+    displayName: Fetch $(TEMP_ENVIRONMENT_PATH) $(TEMP_ENVIRONMENT_BRANCH)
+    timeoutInMinutes: 2
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/fetch_latest_commit.sh'
+      workingDirectory: $(TEMP_ENVIRONMENTS_DIRECTORY)
+  
+  - task: Bash@3
+    displayName: Validate pipeline parameters
+    timeoutInMinutes: 2
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/validate_parameters.sh'
+        
+    # Loop through the individual file paths from the comma-separated versionFilePath parameter
+  - ${{ each versionFilePath in split(parameters.versionFilePath, ',')}}:
+    - task: Bash@3
+      displayName: Validate file ${{ versionFilePath }}
+      timeoutInMinutes: 2
+      env:
+        TEMP_VERSION_PATCH_FILE_PATH: ${{ versionFilePath }}
+      inputs:
+        filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/validate_version_file.sh'
+          
+    - task: Bash@3
+      timeoutInMinutes: 5
+      condition: and(succeeded(), eq(variables['TEMP_PRODUCT'], 'pwa'))
+      displayName: "PWA: Process ${{ versionFilePath }}"
+      inputs:
+        filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/process_pwa.sh'
+
+    - task: Bash@3
+      timeoutInMinutes: 5
+      condition: and(succeeded(), eq(variables['TEMP_PRODUCT'], 'icm'))
+      displayName: "ICM: Process ${{ versionFilePath }}"
+      inputs:
+        filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/process_icm.sh'
+          
+    - task: Bash@3
+      timeoutInMinutes: 5
+      condition: and(succeeded(), eq(variables['TEMP_PRODUCT'], 'iom'))
+      displayName: "IOM: Process ${{ versionFilePath }}"
+      env:
+        TEMP_IMAGE_ARTIFACT_FILE_PATH: $(TEMP_IMAGE_ARTIFACT_FILE_PATH)
+      inputs:
+        filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/process_iom.sh'
+          
+  - task: Bash@3
+    timeoutInMinutes: 1
+    displayName: "Generate branch name"
+    condition: and(eq(variables['VALID_TAG'], 'true'),not(or(failed(), canceled())))
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/generate_branch_name.sh'
+        
+  - task: Bash@3
+    timeoutInMinutes: 1
+    displayName: "Validate Git config"
+    condition: and(eq(variables['VALID_TAG'], 'true'), succeeded())
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/validate_git_config.sh'
+      workingDirectory: $(TEMP_ENVIRONMENTS_DIRECTORY)
+                  
+  - task: Bash@3
+    timeoutInMinutes: 1
+    displayName: "Setup Git environment"
+    condition: and(eq(variables['VALID_TAG'], 'true'),succeeded())
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/setup_git_environment.sh'
+      workingDirectory: $(TEMP_ENVIRONMENTS_DIRECTORY)
+
+  - task: Bash@3
+    timeoutInMinutes: 5
+    displayName: "Create branch"
+    condition: and(eq(variables['VALID_TAG'], 'true'),succeeded())
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/create_branch.sh'
+      workingDirectory: $(TEMP_ENVIRONMENTS_DIRECTORY)
+          
+  - task: Bash@3
+    timeoutInMinutes: 5
+    name: "Create_PR"
+    condition: and(succeeded(), eq(variables['TEMP_PR_CREATE_PULL_REQUEST'], 'true'), ne(variables['GIT_STATUS'], ''), eq(variables['VALID_TAG'], 'true'))
+    displayName: "Create Pull Request"
+    env:
+      AZURE_DEVOPS_EXT_PAT: $(System.AccessToken)
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/create_pull_request.sh'
+      workingDirectory: $(TEMP_ENVIRONMENTS_DIRECTORY)
+          
+  - task: Bash@3
+    timeoutInMinutes: 1
+    condition: always()
+    continueOnError: true
+    displayName: "Provide pipeline configuration"
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/provide_pipeline_informations.sh'
+        
+  - task: Bash@3
+    timeoutInMinutes: 1
+    condition: always()
+    continueOnError: true
+    displayName: "Provide patch result"
+    inputs:
+      filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/provide_patch_result.sh'

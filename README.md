@@ -39,13 +39,23 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | prReviewers | Additional users or groups to include as reviewers on the new pull request. Space separated. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create |  | No |  |  |
 | prSquash | Squash the commits in the source branch when merging into the target branch. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
 | prAutoComplete | Set the pull request to complete automatically when all policies have passed and the source branch can be merged into the target branch. See: https://learn.microsoft.com/de-de/cli/azure/repos/pr?view=azure-cli-latest#az-repos-pr-create | true | Yes |  |  |
+| prAuthorName | Set the name of the commit and pull request author | ISH-CD | Yes | |  |
+| prAuthorMail | Set the mail of the commit and pull request author| intershop@intershop.com | Yes | |  |
 | usePredefinedRegistry | Decide whether to use a predefined registry or the registry value from the imagePropertiesFile. | false | Yes | pwa |  |
 | usePredefinedPullPolicy | Decide whether to use a predefined pullPolicy.  | false | No | icm |  |
 | predefinedPullPolicy | Predefined PullPolicy. | IfNotPresent | No | icm |  |
+| templateRepository | Resource name of this template repository. | cd-partner-devops | Yes | |  |
 | imageTagPattern | Regular expression pattern that the ImageTag must satisfy. This pattern ensures that the ImageTag is a valid Docker image tag and can be used to process only Docker Tags with this particular pattern. (POSIX-Extended Regular Expressions) | ^[^\s][[:graph:]]*$ | Yes |  |  |
 | icmPredefinedProjectCustomizationName | ICM specific parameter. Predefined name of the project customization to be set in the values.yaml file. The value should only include a-z, 0-9, and hyphens. | icm-as-customization-project-icm | Yes | icm |  |
 | pwaPredefinedSsrRegistry | PWA specific parameter. Predefined registry for SSR. |  | No | pwa |  |
 | pwaPredefinedNginxRegistry | PWA specific parameter. Predefined registry for Nginx. |  | No | pwa |  |
+| useDeploymentJob | Decide whether to use a deployment job. Attention: The deployment environments must be present and configured in the Azure DevOps project. | false | Yes |  |  |
+| deploymentEnvironment | Name of the Deployment Environment. This environment must exist in the Azure DevOps project. | < product >_< env > | No | |  |
+| manualValidationEnabled | Decide whether a manual validation should be carried out before the job. See: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines | false | Yes | | |
+| manualValidationEnabledForPrd | Decide whether a manual validation should be performed before the job, which is intended for a PRD environment. Should be enabled and is only applicable for ICM or IOM. | true | Yes | | |
+| manualValidationTimeout | Specify the maximum duration of the manual validation in minutes. | 43200 | Yes | |  |
+| manualValidationNotifyUsers | Specify which users or groups should be informed about the upcoming manual validation. Example: <pre><code>manualValidationNotifyUsers: \| <br> userA@demo.com<br> userB@demo.com </code></pre> | | No | |  |
+| manualValidationInfoText | Specify the information text for the manual validation. | "Please confirm: No breaking DB changes that could require DB rollback." | Yes | |  |
 
 ## Process:
 
