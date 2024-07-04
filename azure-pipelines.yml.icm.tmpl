@@ -19,10 +19,8 @@ resources:
         # Trigger by branch pipeline
         - master
         - develop
-      # Trigger by tag pipeline
-      tags:
-        include:
-          - version/*
+        # Trigger by tag pipeline
+        - refs/tags/version/*
 
   repositories:
     - repository: environments
@@ -36,7 +34,7 @@ resources:
       ref: refs/heads/stable/v1
 
 variables:
-  # Library icm11-build-configuration is provided by Intershops DevOps Environment. It provides
+  # Library icm-build-configuration is provided by Intershops DevOps Environment. It provides
   # the following variables:
   #  - BUILD_AGENT_POOL:                  name of the build agent pool
   #  - REPO_SERVICE_CONNECTION:           service connection to the customer ACR
@@ -44,7 +42,7 @@ variables:
   #  - INTERSHOP_REPO_SERVICE_CONNECTION: service connection to the Intershop container registry
   #  - INTERSHOP_REPO_PATH:               host name and path of the Intershop container registry
   #  - ARTIFACT_FEED                      name of the icm artifacts feed
-  - group: icm11-build-configuration
+  - group: icm-build-configuration
 
 #
 # The CD process can be very individual.
