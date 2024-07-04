@@ -70,7 +70,7 @@ The respective CI pipelines of the different products of the Intershop Commerce 
         registry: <NAME>.azurecr.io
         buildWith:
         - type: buildWith
-            tag: 11.X.X
+            tag: 12.X.X
             name: <IMAGE_NAME>
             registry: intershop
     ```

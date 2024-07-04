@@ -11,19 +11,17 @@ appendCommitMessageToRunName: false
 
 resources:
   pipelines:
-  - pipeline: <pwa-ci-pipeline>
-    source: <pwa-ci-pipeline>
+  - pipeline: <pwa-ci-pipeline-name>
+    source: <pwa-ci-pipeline-name>
     trigger:
       branches:
         include:
-          # Trigger by branch pipeline
-          - master
-          - develop
-          - release/*
-      # Trigger by tag pipeline
-      tags:
-        include:
-          - version/*
+        # Trigger by branch pipeline
+        - master
+        - develop
+        - release/*
+        # Trigger by tag pipeline
+        - refs/tags/version/*
 
   repositories:
     - repository: environments
