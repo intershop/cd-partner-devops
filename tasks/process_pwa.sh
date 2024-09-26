@@ -33,9 +33,9 @@ for image in "${IMAGES_MAPPING[@]}"; do
         TAG="${IMAGE_TAG}" \
         yq -i '.spec.values.image.tag = strenv(TAG)' "${PATCH_FILE_FULL_PATH}"
 
-        # If TEMP_USE_PREDEFINED_REGISTRY is true, than use PWAPREDEFINEDSSRREGISTRY as registry
+        # If TEMP_USE_PREDEFINED_REGISTRY is true, than use TEMP_PWA_PREDEFINED_SSR_REGISTRY as registry
         if [[ "${TEMP_USE_PREDEFINED_REGISTRY}" == "True" ]]; then
-        FINAL_REPOSITORY="${PWAPREDEFINEDSSRREGISTRY}/${IMAGE_NAME}"
+        FINAL_REPOSITORY="${TEMP_PWA_PREDEFINED_SSR_REGISTRY}/${IMAGE_NAME}"
         else
         FINAL_REPOSITORY="${IMAGE_REGISTRY}/${IMAGE_NAME}"
         fi
@@ -51,9 +51,9 @@ for image in "${IMAGES_MAPPING[@]}"; do
         TAG="${IMAGE_TAG}" \
         yq -i '.spec.values.cache.image.tag = strenv(TAG)' "${PATCH_FILE_FULL_PATH}"
 
-        # If ${TEMP_USE_PREDEFINED_REGISTRY} is true, than use PWAPREDEFINEDNGINXREGISTRY as registry
+        # If ${TEMP_USE_PREDEFINED_REGISTRY} is true, than use TEMP_PWA_PREDEFINED_NGINX_REGISTRY as registry
         if [[ "${TEMP_USE_PREDEFINED_REGISTRY}" == "True" ]]; then
-        FINAL_REPOSITORY="${PWAPREDEFINEDNGINXREGISTRY}/${IMAGE_NAME}"
+        FINAL_REPOSITORY="${TEMP_PWA_PREDEFINED_NGINX_REGISTRY}/${IMAGE_NAME}"
         else
         FINAL_REPOSITORY="${IMAGE_REGISTRY}/${IMAGE_NAME}"
         fi
