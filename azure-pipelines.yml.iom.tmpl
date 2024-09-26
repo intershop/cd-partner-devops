@@ -20,9 +20,8 @@ resources:
         - master
         - develop
         # Trigger by tag pipeline
-      tags:
-        include:
-          - *
+        # Trigger by tag pipeline
+        - refs/tags/*
 
   repositories:
     - repository: <environments-repository>
