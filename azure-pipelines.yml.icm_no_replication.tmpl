@@ -11,8 +11,8 @@ appendCommitMessageToRunName: false
 
 resources:
   pipelines:
-  - pipeline: <iom-ci-pipeline-name>
-    source: <iom-ci-pipeline-name>
+  - pipeline: <icm-ci-pipeline-name>
+    source: <icm-ci-pipeline-name>
     trigger:
       branches:
         include:
@@ -20,7 +20,7 @@ resources:
         - master
         - develop
         # Trigger by tag pipeline
-        - refs/tags/*
+        - refs/tags/version/*
 
   repositories:
     - repository: environments
@@ -34,12 +34,15 @@ resources:
       ref: refs/heads/stable/v1
 
 variables:
-  # Library iom-build-configuration is provided by Intershops DevOps Environment. It provides
+  # Library icm-build-configuration is provided by Intershops DevOps Environment. It provides
   # the following variables:
   #  - BUILD_AGENT_POOL:                  name of the build agent pool
   #  - REPO_SERVICE_CONNECTION:           service connection to the customer ACR
   #  - REPO_PATH:                         host name and path of the customer ACR
-  - group: iom-build-configuration
+  #  - INTERSHOP_REPO_SERVICE_CONNECTION: service connection to the Intershop container registry
+  #  - INTERSHOP_REPO_PATH:               host name and path of the Intershop container registry
+  #  - ARTIFACT_FEED                      name of the icm artifacts feed
+  - group: icm-build-configuration
 
 #
 # The CD process can be very individual.
@@ -53,42 +56,42 @@ stages:
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
         env: int
-        product: iom
+        product: icm
         environmentPath: environments
-        triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: int/iom/version.yaml
+        triggerPipelineName: <icm-ci-pipeline-name>
+        versionFilePath: int/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
 - stage: CD_uat
   dependsOn:
     - CD_int
-  condition: and(succeeded(), startsWith(variables['resources.pipeline.<iom-ci-pipeline-name>.sourceBranch'], 'refs/tags/'))
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<icm-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
   jobs:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
         env: uat
-        product: iom
+        product: icm
         environmentPath: environments
-        triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: uat/iom/version.yaml
+        triggerPipelineName: <icm-ci-pipeline-name>
+        versionFilePath: uat/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
 - stage: CD_prd
   dependsOn:
     - CD_uat
-  condition: and(succeeded(), startsWith(variables['resources.pipeline.<iom-ci-pipeline-name>.sourceBranch'], 'refs/tags/'))
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<icm-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
   jobs:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
         env: prd
-        product: iom
+        product: icm
         environmentPath: environments
-        triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: prd/iom/version.yaml
+        triggerPipelineName: <icm-ci-pipeline-name>
+        versionFilePath: prd/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
