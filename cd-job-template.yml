@@ -48,6 +48,7 @@ parameters:
   - icm
   - pwa
   - iom
+  - custom
 
   # Name of the environment.
 - name: env
@@ -172,6 +173,26 @@ parameters:
   default: ''
 
 #
+# Custom specific parameter
+#
+  # Determine which object to use from the imagePropertiesFile based on the type
+- name: customSelectedImageType
+  type: string
+  default: ''
+
+  # Specify the YAML yq path where the image name should be set
+- name: customImageNameYamlPath
+  type: string
+  default: ''
+
+  # Specify the YAML yq path where the image tag should be set
+  # If this value is the same as customImageNameYamlPath, the following format will be used:
+  # <customImageNameYamlPath> = <registry>/<imagename>:<tag>
+- name: customTagYamlPath
+  type: string
+  default: ''
+
+#
 # Deployment
 #
 
@@ -229,7 +250,7 @@ jobs:
           notifyUsers: ${{ parameters.manualValidationNotifyUsers }}
           instructions: '${{ parameters.manualValidationInfoText }} For ${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}'
           onTimeout: 'reject'
-  - ${{ if eq(parameters.useDeploymentJob, false) }}:
+  - ${{ if or(eq(parameters.useDeploymentJob, false), eq(parameters.product, 'custom') ) }}:
     - job: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       displayName: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       pool: '${{ parameters.agentPool }}'
@@ -266,6 +287,9 @@ jobs:
         TEMP_ICM_PREDEFINED_PROJECT_CUSTOMIZATION_NAME: ${{ parameters.icmPredefinedProjectCustomizationName }}
         TEMP_PWA_PREDEFINED_SSR_REGISTRY: ${{ parameters.pwaPredefinedSsrRegistry }}
         TEMP_PWA_PREDEFINED_NGINX_REGISTRY: ${{ parameters.pwaPredefinedNginxRegistry }}
+        TEMP_CUSTOM_SELECTED_IMAGE_TYPE: ${{ parameters.customSelectedImageType }}
+        TEMP_CUSTOM_IMAGE_NAME_YAML_PATH: ${{ parameters.customImageNameYamlPath }}
+        TEMP_CUSTOM_TAG_YAML_PATH: ${{ parameters.customTagYamlPath }}
         TEMP_PR_AUTHOR_NAME: ${{ parameters.prAuthorName }}
         TEMP_PR_AUTHOR_EMAIL: ${{ parameters.prAuthorMail }}
         TEMP_IMAGE_ARTIFACT_FILE_PATH: $(Pipeline.Workspace)/$(TEMP_TRIGGER_PIPELINE_NAME)/$(TEMP_PIPELINE_ARTIFACT_NAME)/$(TEMP_IMAGE_PROPERTIES_FILE)
@@ -328,6 +352,9 @@ jobs:
         TEMP_ICM_PREDEFINED_PROJECT_CUSTOMIZATION_NAME: ${{ parameters.icmPredefinedProjectCustomizationName }}
         TEMP_PWA_PREDEFINED_SSR_REGISTRY: ${{ parameters.pwaPredefinedSsrRegistry }}
         TEMP_PWA_PREDEFINED_NGINX_REGISTRY: ${{ parameters.pwaPredefinedNginxRegistry }}
+        TEMP_CUSTOM_SELECTED_IMAGE_TYPE: ${{ parameters.customSelectedImageType }}
+        TEMP_CUSTOM_IMAGE_NAME_YAML_PATH: ${{ parameters.customImageNameYamlPath }}
+        TEMP_CUSTOM_TAG_YAML_PATH: ${{ parameters.customTagYamlPath }}
         TEMP_PR_AUTHOR_NAME: ${{ parameters.prAuthorName }}
         TEMP_PR_AUTHOR_EMAIL: ${{ parameters.prAuthorMail }}
         TEMP_IMAGE_ARTIFACT_FILE_PATH: $(Pipeline.Workspace)/$(TEMP_TRIGGER_PIPELINE_NAME)/$(TEMP_PIPELINE_ARTIFACT_NAME)/$(TEMP_IMAGE_PROPERTIES_FILE)
