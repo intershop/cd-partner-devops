@@ -311,7 +311,7 @@ jobs:
             environmentPath: ${{ parameters.environmentPath }}
             templateRepository: ${{ parameters.templateRepository }}
 
-  - ${{ if eq(parameters.useDeploymentJob, true) }}:
+  - ${{ if and(eq(parameters.useDeploymentJob, true), in(parameters.product, 'icm', 'iom', "pwa") ) }}:
     - deployment: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       displayName: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       pool: '${{ parameters.agentPool }}'
