@@ -1,0 +1,102 @@
+# This is just one example of how the job template can be utilized. 
+# Project-specific modifications can be made as needed, providing flexibility and adaptability.
+
+# Define the conditions that trigger the pipeline.
+# This pipeline is triggered on changes to the specified branches and tags.
+# See https://docs.microsoft.com/en-us/azure/devops/pipelines/repos/azure-repos-git?view=azure-devops&tabs=yaml#ci-triggers
+trigger: none
+
+name: $(Date:yyyyMMdd)$(Rev:.r)
+appendCommitMessageToRunName: false
+
+resources:
+  pipelines:
+  - pipeline: <custom-ci-pipeline-name>
+    source: <custom-ci-pipeline-name>
+    trigger:
+      branches:
+        include:
+        # Trigger by branch pipeline
+        - master
+        - develop
+        # Trigger by tag pipeline
+        - refs/tags/version/*
+
+  repositories:
+    - repository: environments
+      type: git
+      name: environments
+      ref: master
+    - repository: cd-partner-devops
+      type: github
+      endpoint: INTERSHOP_GITHUB
+      name: intershop/cd-partner-devops
+      ref: refs/heads/stable/v1
+
+variables:
+  # Library azure-devops-build-machines is provided by Intershops DevOps Environment. It provides
+  # the following variables:
+  #  - BUILD_AGENT_POOL_SMALL:            name of the build agent pool
+  - group: azure-devops-build-machines
+
+
+#
+# The CD process can be very individual.
+# The template has numerous parameters to configure the behavior separately for each environment.
+#
+
+stages:
+- stage: CD_int
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL_SMALL)
+        env: int
+        product: custom # The value custom is required.
+        environmentPath: environments
+        triggerPipelineName: <custom-ci-pipeline-name>
+        versionFilePath: int/custom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: false # Not possible with type custom
+        customSelectedImageType: customName # Is the images[].type value that was defined in the CI pipeline.
+        customImageNameYamlPath: .spec.values.image.repository
+        customTagYamlPath: .spec.values.image.tag
+
+- stage: CD_uat
+  dependsOn:
+    - CD_int
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<custom-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL_SMALL)
+        env: uat
+        product: custom # The value custom is required.
+        environmentPath: environments
+        triggerPipelineName: <custom-ci-pipeline-name>
+        versionFilePath: uat/custom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: false # Not possible with type custom
+        customSelectedImageType: customName # Is the images[].type value that was defined in the CI pipeline.
+        customImageNameYamlPath: .spec.values.image.repository
+        customTagYamlPath: .spec.values.image.tag
+
+- stage: CD_prd
+  dependsOn:
+    - CD_uat
+  condition: and(succeeded(), startsWith(variables['resources.pipeline.<custom-ci-pipeline-name>.sourceBranch'], 'refs/tags/version/'))
+  jobs:
+    - template: cd-job-template.yml@cd-partner-devops
+      parameters:
+        agentPool: $(BUILD_AGENT_POOL_SMALL)
+        env: prd
+        product: custom # The value custom is required.
+        environmentPath: environments
+        triggerPipelineName: <custom-ci-pipeline-name>
+        versionFilePath: prd/custom/version.yaml
+        prAutoComplete: true
+        useDeploymentJob: false # Not possible with type custom
+        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+        customSelectedImageType: customName # Is the images[].type value that was defined in the CI pipeline.
+        customImageNameYamlPath: .spec.values.image.repository
+        customTagYamlPath: .spec.values.image.tag
