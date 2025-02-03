@@ -70,6 +70,15 @@ steps:
         TEMP_IMAGE_ARTIFACT_FILE_PATH: $(TEMP_IMAGE_ARTIFACT_FILE_PATH)
       inputs:
         filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/process_iom.sh'
+    
+    - task: Bash@3
+      timeoutInMinutes: 5
+      condition: and(succeeded(), eq(variables['TEMP_PRODUCT'], 'custom'))
+      displayName: "Custom: Process ${{ versionFilePath }}"
+      env:
+        TEMP_IMAGE_ARTIFACT_FILE_PATH: $(TEMP_IMAGE_ARTIFACT_FILE_PATH)
+      inputs:
+        filePath: '$(TEMP_TEMPLATE_DIRECTORY)/tasks/process_custom.sh'
           
   - task: Bash@3
     timeoutInMinutes: 1

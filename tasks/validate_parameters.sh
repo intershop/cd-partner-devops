@@ -42,6 +42,11 @@ icmPredefinedProjectCustomizationName:${TEMP_ICM_PREDEFINED_PROJECT_CUSTOMIZATIO
 ssrRegistry:                          ${TEMP_PWA_PREDEFINED_SSR_REGISTRY}
 nginxRegistry:                        ${TEMP_PWA_PREDEFINED_NGINX_REGISTRY}
 
+# Custom
+customSelectedImageType:              ${TEMP_CUSTOM_SELECTED_IMAGE_TYPE}
+customImageNameYamlPath:              ${TEMP_CUSTOM_IMAGE_NAME_YAML_PATH}
+customTagYamlPath:                    ${TEMP_CUSTOM_TAG_YAML_PATH}
+
 # Deplyoment
 useDeploymentJob:                     ${TEMP_USE_DEPLOYMENT_JOB}
 deploymentEnvironment:                ${TEMP_DEPLOYMENT_ENVIRONMENT}
@@ -95,6 +100,14 @@ fi
 if [ -n "${TEMP_ID}" ]; then
     if echo "${TEMP_ID}" | grep -q '[^a-zA-Z0-9_]'; then
         echo "##[error] Parameter id has to consist of characters, numbers and _ only!"
+        exit 1
+    fi
+fi
+
+# Custom
+if [[ "$TEMP_PRODUCT" == "custom" ]]; then
+    if [[ -z "${TEMP_CUSTOM_SELECTED_IMAGE_TYPE}" || -z "${TEMP_CUSTOM_IMAGE_NAME_YAML_PATH}" || -z "${TEMP_CUSTOM_TAG_YAML_PATH}" ]]; then
+        echo "Error: One or more required custom variables are empty!"
         exit 1
     fi
 fi

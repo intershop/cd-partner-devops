@@ -4,13 +4,14 @@
 ## Overview
 
 Repository *cd-partner-devops* provides an *Azure DevOps Pipeline* template, which an be used to define and automate the CD process in a pipeline.
-The template should be used as is. Any custom additions should be made outside of the template.
+The pipeline template `cd-job-template.yml` should be used as is. Any custom additions should be made outside of the template.
 
 This pipeline template can only be used in conjunction with the following preceding CI pipeline templates:
 
 - ICM: https://github.com/intershop/icm-partner-devops
 - PWA: https://github.com/intershop/pwa-partner-devops
 - IOM: https://github.com/intershop/iom-partner-devops
+- Custom: https://github.com/intershop/custom-partner-devops
 
 ## How to use the pipeline template
 
@@ -26,7 +27,7 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | agentPool | Specifies the name of the agent pool. The pool name cannot be hardcoded in the pipeline template. |  | Yes |  |  |
 | jobTimeoutInMinutes | Specifies the maximum job execution time in minutes. | 300 | Yes |  |  |
 | jobContinueOnError | Specifies whether future jobs should run even if this job fails. | false | Yes |  |  |
-| product | Specifies the product. Each product requires an individual process. |  | Yes |  | icm,pwa |
+| product | Specifies the product. Each product requires an individual process. |  | Yes |  | icm,pwa,iom,custom |
 | env | Name of the environment. |  | Yes |  |  |
 | environmentPath | Name of the environments repository. The name is given in "resources.repositories". | environments | Yes |  |  |
 | environmentBranch | Name of the environments branch. The branch name is given in "resources.repositories". | master | Yes |  |  |
@@ -49,6 +50,9 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | icmPredefinedProjectCustomizationName | ICM specific parameter. Predefined name of the project customization to be set in the values.yaml file. The value should only include a-z, 0-9, and hyphens. | icm-as-customization-project-icm | Yes | icm |  |
 | pwaPredefinedSsrRegistry | PWA specific parameter. Predefined registry for SSR. |  | No | pwa |  |
 | pwaPredefinedNginxRegistry | PWA specific parameter. Predefined registry for Nginx. |  | No | pwa |  |
+| customSelectedImageType | Custom specific parameter. Determine which object to use from the imagePropertiesFile based on the type. |  | Yes | custom |  |
+| customImageNameYamlPath | Custom specific parameter. Specify the YAML yq path where the image name should be set. |  | Yes | custom |  |
+| customTagYamlPath | Custom specific parameter. Specify the YAML yq path where the image tag should be set |  | Yes | custom |  |
 | useDeploymentJob | Decide whether to use a deployment job. Attention: The deployment environments must be present and configured in the Azure DevOps project. | false | Yes |  |  |
 | deploymentEnvironment | Name of the Deployment Environment. This environment must exist in the Azure DevOps project. | < product >_< env > | No | |  |
 | manualValidationEnabled | Decide whether a manual validation should be carried out before the job. See: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines | false | Yes | | |
@@ -65,39 +69,52 @@ The respective CI pipelines of the different products of the Intershop Commerce 
     ```
     images:
     - type: icm-customization
-        tag: <IMAGE_TAG>
-        name: <IMAGE_NAME>
-        registry: <NAME>.azurecr.io
-        buildWith:
+      tag: <IMAGE_TAG>
+      name: <IMAGE_NAME>
+      registry: <NAME>.azurecr.io
+      buildWith:
         - type: buildWith
-            tag: 12.X.X
-            name: <IMAGE_NAME>
-            registry: intershop
+          tag: 12.X.X
+          name: <IMAGE_NAME>
+          registry: intershop
     ```
 
 - PWA:
     ```
     images:
     - type: ssr
-        tag: <IMAGE_TAG>
-        name: <IMAGE_NAME>
-        registry: <NAME>.azurecr.io
+      tag: <IMAGE_TAG>
+      name: <IMAGE_NAME>
+      registry: <NAME>.azurecr.io
     - type: nginx
-        tag: <IMAGE_TAG>
-        name: issup/issup/master/pwa-nginx
-        registry: <NAME>.azurecr.io
+      tag: <IMAGE_TAG>
+      name: issup/issup/master/pwa-nginx
+      registry: <NAME>.azurecr.io
     ```
     
 - IOM:
     ```
     images:
     - type: iom
-        tag: <IMAGE_TAG>
-        name: <IMAGE_NAME>
-        registry: <NAME>.azurecr.io
+      tag: <IMAGE_TAG>
+      name: <IMAGE_NAME>
+      registry: <NAME>.azurecr.io
+    ```
+
+- Custom:
+    ```
+    images:
+    - type: customName
+      tag: <IMAGE_TAG>
+      name: <IMAGE_NAME>
+      registry: <NAME>.azurecr.io
     ```
 
 These imageProberties files are read by this pipeline template provided here, evaluated for each product, and generate a pull request for all changes in the respective Flux configuration repository.
+
+## Examples
+
+The `examples` folder contains sample pipeline templates for specific products like ICM, PWA, and IOM. You can use these as a starting point for your pipelines.
 
 ## Important information:
 
