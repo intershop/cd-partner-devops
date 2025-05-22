@@ -56,7 +56,7 @@ stages:
         product: iom
         environmentPath: environments
         triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: int/iom/version.yaml
+        versionFilePath: <customer-system>/int/iom/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -72,7 +72,7 @@ stages:
         product: iom
         environmentPath: environments
         triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: uat/iom/version.yaml
+        versionFilePath: <customer-system>/uat/iom/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -88,7 +88,7 @@ stages:
         product: iom
         environmentPath: environments
         triggerPipelineName: <iom-ci-pipeline-name>
-        versionFilePath: prd/iom/version.yaml
+        versionFilePath: <customer-system>/prd/iom/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

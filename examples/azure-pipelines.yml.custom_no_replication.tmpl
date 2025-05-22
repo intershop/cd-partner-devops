@@ -55,7 +55,7 @@ stages:
         product: custom # The value custom is required.
         environmentPath: environments
         triggerPipelineName: <custom-ci-pipeline-name>
-        versionFilePath: int/custom/version.yaml
+        versionFilePath: <customer-system>/int/custom/version.yaml
         prAutoComplete: true
         useDeploymentJob: false # Not possible with type custom
         customSelectedImageType: customName # Is the images[].type value that was defined in the CI pipeline.
@@ -74,7 +74,7 @@ stages:
         product: custom # The value custom is required.
         environmentPath: environments
         triggerPipelineName: <custom-ci-pipeline-name>
-        versionFilePath: uat/custom/version.yaml
+        versionFilePath: <customer-system>/uat/custom/version.yaml
         prAutoComplete: true
         useDeploymentJob: false # Not possible with type custom
         customSelectedImageType: customName # Is the images[].type value that was defined in the CI pipeline.
@@ -93,7 +93,7 @@ stages:
         product: custom # The value custom is required.
         environmentPath: environments
         triggerPipelineName: <custom-ci-pipeline-name>
-        versionFilePath: prd/custom/version.yaml
+        versionFilePath: <customer-system>/prd/custom/version.yaml
         prAutoComplete: true
         useDeploymentJob: false # Not possible with type custom
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

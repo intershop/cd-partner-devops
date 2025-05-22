@@ -57,7 +57,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: int/pwa/version.yaml
+        versionFilePath: <customer-system>/int/pwa/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -73,7 +73,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: uat/pwa/version.yaml
+        versionFilePath: <customer-system>/uat/pwa/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -89,7 +89,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: prd/pwa/version.yaml
+        versionFilePath: <customer-system>/prd/pwa/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
         manualValidationEnabledForPrd: false
