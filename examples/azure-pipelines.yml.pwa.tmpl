@@ -58,7 +58,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: int/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/int/pwa/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -69,7 +69,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: int/pwa/version-live.yaml
+        versionFilePath: <customer-system>/int/pwa/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         dependsOn: "CD_pwa_int_edit"
@@ -86,7 +86,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: uat/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/uat/pwa/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -97,7 +97,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: uat/pwa/version-live.yaml
+        versionFilePath: <customer-system>/uat/pwa/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         dependsOn: "CD_pwa_uat_edit"
@@ -114,7 +114,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: prd/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/prd/pwa/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
         manualValidationEnabledForPrd: false
@@ -127,7 +127,7 @@ stages:
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: prd/pwa/version-live.yaml
+        versionFilePath: <customer-system>/prd/pwa/version-live.yaml
         prAutoComplete: true
         manualValidationEnabledForPrd: false
         useDeploymentJob: true

@@ -16,4 +16,8 @@ cat >> "${TEMP_MD_CONFIG_FILE}" <<EOF
     GIT_STATUS:                            ${GIT_STATUS}
 EOF
 
-echo "##vso[task.setvariable variable=GIT_STATUS]${GIT_STATUS}"  
+if [ -z "${GIT_STATUS}" ]; then
+  echo "##vso[task.logissue type=warning]No changes detected in branch '${BRANCH_NAME}' - Pull Request will be skipped. (Stage: ${SYSTEM_STAGEDISPLAYNAME}, Job: ${SYSTEM_JOBDISPLAYNAME}) - ${SYSTEM_JOBIDENTIFIER}"
+fi
+
+echo "##vso[task.setvariable variable=GIT_STATUS]${GIT_STATUS}"

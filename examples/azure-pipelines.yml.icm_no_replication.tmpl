@@ -59,7 +59,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: int/icm/version.yaml
+        versionFilePath: <customer-system>/int/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -75,7 +75,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: uat/icm/version.yaml
+        versionFilePath: <customer-system>/uat/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -91,7 +91,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: prd/icm/version.yaml
+        versionFilePath: <customer-system>/prd/icm/version.yaml
         prAutoComplete: true
         useDeploymentJob: true
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

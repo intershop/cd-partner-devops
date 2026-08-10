@@ -59,7 +59,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: int/icm/version-edit.yaml
+        versionFilePath: <customer-system>/int/icm/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
         
@@ -70,7 +70,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: int/icm/version-live.yaml
+        versionFilePath: <customer-system>/int/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         dependsOn: "CD_icm_int_edit"
@@ -87,7 +87,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: uat/icm/version-edit.yaml
+        versionFilePath: <customer-system>/uat/icm/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
 
@@ -98,7 +98,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: uat/icm/version-live.yaml
+        versionFilePath: <customer-system>/uat/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         dependsOn: "CD_icm_uat_edit"
@@ -115,7 +115,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: prd/icm/version-edit.yaml
+        versionFilePath: <customer-system>/prd/icm/version-edit.yaml
         prAutoComplete: true
         useDeploymentJob: true
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
@@ -127,7 +127,7 @@ stages:
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: prd/icm/version-live.yaml
+        versionFilePath: <customer-system>/prd/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         dependsOn: "CD_icm_prd_edit"
