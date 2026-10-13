@@ -54,25 +54,13 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: int_edit
+        env: int
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/int/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/int/pwa/version-edit.yaml,<customer-system>/int/pwa/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
-
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: int_live
-        product: pwa
-        environmentPath: environments
-        triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/int/pwa/version-live.yaml
-        prAutoComplete: true
-        useDeploymentJob: true
-        dependsOn: "CD_pwa_int_edit"
 
 - stage: CD_uat
   dependsOn:
@@ -82,25 +70,13 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: uat_edit
+        env: uat
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/uat/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/uat/pwa/version-edit.yaml,<customer-system>/uat/pwa/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
-
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: uat_live
-        product: pwa
-        environmentPath: environments
-        triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/uat/pwa/version-live.yaml
-        prAutoComplete: true
-        useDeploymentJob: true
-        dependsOn: "CD_pwa_uat_edit"
 
 - stage: CD_prd
   dependsOn:
@@ -110,26 +86,12 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: prd_edit
+        env: prd
         product: pwa
         environmentPath: environments
         triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/prd/pwa/version-edit.yaml
+        versionFilePath: <customer-system>/prd/pwa/version-edit.yaml,<customer-system>/prd/pwa/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
         manualValidationEnabledForPrd: false
-        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
-    
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: prd_live
-        product: pwa
-        environmentPath: environments
-        triggerPipelineName: <pwa-ci-pipeline-name>
-        versionFilePath: <customer-system>/prd/pwa/version-live.yaml
-        prAutoComplete: true
-        manualValidationEnabledForPrd: false
-        useDeploymentJob: true
-        dependsOn: "CD_pwa_prd_edit"
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'

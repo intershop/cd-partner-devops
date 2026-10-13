@@ -55,25 +55,13 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: int_edit
+        env: int
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/int/icm/version-edit.yaml
+        versionFilePath: <customer-system>/int/icm/version-edit.yaml,<customer-system>/int/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
-        
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: int_live
-        product: icm
-        environmentPath: environments
-        triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/int/icm/version-live.yaml
-        prAutoComplete: true
-        useDeploymentJob: true
-        dependsOn: "CD_icm_int_edit"
 
 - stage: CD_uat
   dependsOn:
@@ -83,25 +71,13 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: uat_edit
+        env: uat
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/uat/icm/version-edit.yaml
+        versionFilePath: <customer-system>/uat/icm/version-edit.yaml,<customer-system>/uat/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
-
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: uat_live
-        product: icm
-        environmentPath: environments
-        triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/uat/icm/version-live.yaml
-        prAutoComplete: true
-        useDeploymentJob: true
-        dependsOn: "CD_icm_uat_edit"
 
 - stage: CD_prd
   dependsOn:
@@ -111,24 +87,11 @@ stages:
     - template: cd-job-template.yml@cd-partner-devops
       parameters:
         agentPool: $(BUILD_AGENT_POOL)
-        env: prd_edit
+        env: prd
         product: icm
         environmentPath: environments
         triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/prd/icm/version-edit.yaml
+        versionFilePath: <customer-system>/prd/icm/version-edit.yaml,<customer-system>/prd/icm/version-live.yaml
         prAutoComplete: true
         useDeploymentJob: true
-        imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
-    
-    - template: cd-job-template.yml@cd-partner-devops
-      parameters:
-        agentPool: $(BUILD_AGENT_POOL)
-        env: prd_live
-        product: icm
-        environmentPath: environments
-        triggerPipelineName: <icm-ci-pipeline-name>
-        versionFilePath: <customer-system>/prd/icm/version-live.yaml
-        prAutoComplete: true
-        useDeploymentJob: true
-        dependsOn: "CD_icm_prd_edit"
         imageTagPattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
