@@ -215,7 +215,7 @@ parameters:
   type: boolean
   default: false
 
-  # Decide whether a manual validation should be performed before the job, which is intended for a PRD environment. Should be enabled and is only applicable for ICM or IOM.
+  # Decide whether a manual validation should be performed before the job, which is intended for a PRD environment.
 - name: manualValidationEnabledForPrd
   type: boolean
   default: false
@@ -237,7 +237,7 @@ parameters:
 
 
 jobs:
-  - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd'), in(parameters.product, 'icm', 'iom')),eq(parameters.manualValidationEnabled, true)) }}:
+  - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd')),eq(parameters.manualValidationEnabled, true)) }}:
     - job: waitForValidation_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       displayName: ManualValidation for ${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       condition: ${{ parameters.condition }}
@@ -255,7 +255,7 @@ jobs:
       displayName: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       pool: '${{ parameters.agentPool }}'
       dependsOn: 
-        - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd'), in(parameters.product, 'icm', 'iom')), eq(parameters.manualValidationEnabled, true)) }}:   
+        - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd')), eq(parameters.manualValidationEnabled, true)) }}:   
           - waitForValidation_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
         - ${{ if ne(parameters.dependsOn, '') }}:
           - ${{ parameters.dependsOn }}
@@ -316,7 +316,7 @@ jobs:
       displayName: CD_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
       pool: '${{ parameters.agentPool }}'
       dependsOn: 
-        - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd'), in(parameters.product, 'icm', 'iom')), eq(parameters.manualValidationEnabled, true)) }}:   
+        - ${{ if or(and(eq(parameters.manualValidationEnabledForPrd, true), startsWith(parameters.env, 'prd')), eq(parameters.manualValidationEnabled, true)) }}:   
           - waitForValidation_${{ parameters.product }}_${{ parameters.env }}${{ parameters.id }}
         - ${{ if ne(parameters.dependsOn, '') }}:
           - ${{ parameters.dependsOn }}

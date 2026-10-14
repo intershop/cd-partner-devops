@@ -56,7 +56,7 @@ Add a file `azure-pipelines.yml` to the root-directory of your `cd-pipeline-repo
 | useDeploymentJob | Decide whether to use a deployment job. Attention: The deployment environments must be present and configured in the Azure DevOps project. | false | Yes |  |  |
 | deploymentEnvironment | Name of the Deployment Environment. This environment must exist in the Azure DevOps project. | < product >_< env > | No | |  |
 | manualValidationEnabled | Decide whether a manual validation should be carried out before the job. See: https://learn.microsoft.com/en-us/azure/devops/pipelines/tasks/reference/manual-validation-v0?view=azure-pipelines | false | Yes | | |
-| manualValidationEnabledForPrd | Decide whether a manual validation should be performed before the job, which is intended for a PRD environment. Should be enabled and is only applicable for ICM or IOM. | true | Yes | | |
+| manualValidationEnabledForPrd | Decide whether a manual validation should be performed before the job, which is intended for a PRD environment | false | Yes | | |
 | manualValidationTimeout | Specify the maximum duration of the manual validation in minutes. | 43200 | Yes | |  |
 | manualValidationNotifyUsers | Specify which users or groups should be informed about the upcoming manual validation. Example: <pre><code>manualValidationNotifyUsers: \| <br> userA@demo.com<br> userB@demo.com </code></pre> | | No | |  |
 | manualValidationInfoText | Specify the information text for the manual validation. | "Please confirm: No breaking DB changes that could require DB rollback." | Yes | |  |
